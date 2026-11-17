@@ -1,0 +1,52 @@
+{
+  "_comentario": "MesaLista · configuración del servidor. Copiar como config.json (install.sh lo hace y rellena las claves). config.json contiene secretos y no se sube a Git.",
+
+  "listen": {
+    "host": "127.0.0.1",
+    "port": 8091
+  },
+
+  "db": {
+    "host": "127.0.0.1",
+    "port": 5432,
+    "name": "mesalista",
+    "user": "mesalista",
+    "pass": "CAMBIAR"
+  },
+
+  "domain": "mesalista.spaincentral.cloudapp.azure.com",
+
+  "qr_secret": "CAMBIAR",
+
+  "require_https": true,
+
+  "test_clock": false,
+
+  "trusted_proxies": ["127.0.0.1", "::1"],
+
+  "front": {
+    "reset": "https://<dominio>/restablecer?token={token}",
+    "payment_web": "https://<dominio>/reservas/{id}?pago={result}",
+    "payment_app": "mesalista://reserva/{id}?pago={result}",
+    "payment_unknown": "https://<dominio>/reservas?pago=error"
+  },
+
+  "mail": {
+    "enabled": false,
+    "connection_string": "",
+    "sender": ""
+  },
+
+  "fcm": {
+    "enabled": false,
+    "project_id": "",
+    "client_email": "",
+    "private_key": ""
+  },
+
+  "paypal": {
+    "mode": "sandbox",
+    "client_id": "",
+    "secret": ""
+  }
+}

@@ -23,8 +23,6 @@ info:
 servers:
   - url: https://mesalista.spaincentral.cloudapp.azure.com/api/v1
     description: Servidor de Azure
-  - url: http://127.0.0.1:8091/api/v1
-    description: Desarrollo en local
 
 tags:
   - name: Público
@@ -473,16 +471,6 @@ paths:
       responses:
         '303':
           description: Redirección a front.payment_web, front.payment_app o front.payment_unknown
-
-  /payments/fake-approve:
-    get:
-      tags: [Grupos y señal]
-      summary: Pasarela simulada (solo en un servidor de pruebas)
-      parameters:
-        - {name: token, in: query, required: true, schema: {type: string}}
-      responses:
-        '303': {description: Redirección a /payments/return}
-        '404': {$ref: '#/components/responses/NotFound'}
 
   /group-requests/times:
     get:

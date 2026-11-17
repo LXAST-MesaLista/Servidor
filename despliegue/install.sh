@@ -222,7 +222,7 @@ SQL
 HAS_TABLES=$(psql_admin -tA -d "$DB_NAME" -c "SELECT to_regclass('public.reservations') IS NOT NULL")
 if [[ "$HAS_TABLES" != "t" ]]; then
     psql_owner "$REPO_DIR/bd/esquema.sql" "$REPO_DIR/bd/datos.sql"
-    echo "Base de datos creada con el restaurante de pruebas."
+    echo "Base de datos creada (sin mesas ni horarios: se configuran en Administración)."
 fi
 psql_admin -d "$DB_NAME" -f - < "$REPO_DIR/despliegue/permisos.sql"
 
@@ -438,6 +438,8 @@ cat <<EOF
     sudo node ${APP_DIR}/bin/configure-fcm.js <cuenta-de-servicio.json>
   Señal de los grupos con PayPal sandbox (opcional):
     sudo node ${APP_DIR}/bin/configure-paypal.js
-  Cuentas de demostración (opcional):
-    sudo -u ${APP_USER} node ${APP_DIR}/bin/seed-demo.js "<contraseña de al menos 10 caracteres>"
+  Después de cambiar las claves: sudo systemctl restart mesalista-api
+
+  Siguiente paso: entra en el panel como ${ADMIN_EMAIL} y, en Administración,
+  da de alta las mesas, el plano, las franjas de servicio y el PIN de «Cerrar local».
 EOF

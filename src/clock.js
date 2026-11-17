@@ -1,14 +1,10 @@
 // Hora del servidor (zona de Madrid), fija durante toda la petición.
 // Todas las comprobaciones de tiempo pasan por aquí (regla 2).
 //
-// En las pruebas, con "test_clock" activado, la cabecera X-Test-Now
-// ("2026-11-07 20:50:00") simula otra hora.
-//
 // Las fechas son objetos Date en hora local (TZ = Europe/Madrid) y nunca se
 // modifican: cada operación devuelve otro. En la base de datos van como texto
 // "AAAA-MM-DD HH:MM:SS" (timestamp sin zona).
 
-import { config } from './config.js';
 import { state } from './context.js';
 
 const SQL_RE = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/;
@@ -19,24 +15,11 @@ const pad = (n, w = 2) => String(n).padStart(w, '0');
 export function now() {
   const s = state();
   if (s.now === null) {
-    let t = new Date();
-    const simulated = s.req?.headers['x-test-now'];
-    if (typeof simulated === 'string' && config('test_clock') === true
-      && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(simulated)) {
-      const parsed = parse(simulated);
-      if (parsed !== null) {
-        t = parsed;
-      }
-    }
+    const t = new Date();
     t.setMilliseconds(0);
     s.now = t;
   }
   return s.now;
-}
-
-/** Fija la hora (scripts de línea de órdenes y pruebas). */
-export function setNow(t) {
-  state().now = t;
 }
 
 /** "AAAA-MM-DD HH:MM:SS" o "AAAA-MM-DD" → Date (hora local), o null. */

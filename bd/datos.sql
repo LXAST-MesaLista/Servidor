@@ -1,45 +1,14 @@
--- MesaLista · Datos iniciales del restaurante ficticio de pruebas
+-- MesaLista · Datos iniciales imprescindibles
 --
--- 12 mesas en dos zonas (S-1 a S-8 en la sala, T-1 a T-4 en la terraza), de 2
--- a 10 plazas, con su sitio en el plano de cada zona, y 2 mesas extra (E-1,
--- E-2) sin plano que solo sirven para unir; comidas de 13:00 a 16:00 y cenas
--- de 20:00 a 00:00 todos los días; parámetros con los valores iniciales de la
--- tabla «Reglas del servicio».
+-- Solo lo que la API necesita para arrancar: los parámetros del servicio con
+-- sus valores iniciales (tabla «Reglas del servicio») y unas opciones de menú
+-- habituales. Las mesas, su plano, las franjas de servicio y los días
+-- cerrados los define el administrador desde el panel (Administración).
 --
--- Las cuentas (administrador, personal y clientes de prueba) no van aquí
--- porque sus contraseñas se guardan con Argon2id: se crean con
--- bin/create-user.js y bin/seed-demo.js.
+-- Las cuentas no van aquí porque sus contraseñas se guardan con Argon2id: la
+-- primera de administrador la crea install.sh con bin/create-user.js.
 --
 -- Uso: psql -d mesalista -f datos.sql   (después de esquema.sql)
-
--- pos_x / pos_y: centro de la mesa en el lienzo de 1000 × 600 de su zona.
-INSERT INTO dining_tables (number, zone, min_capacity, max_capacity, pos_x, pos_y, shape) VALUES
-  (1, 'Sala',    1,  2, 110, 110, 'round'),
-  (2, 'Sala',    1,  2, 110, 300, 'round'),
-  (3, 'Sala',    2,  4, 330, 110, 'rect'),
-  (4, 'Sala',    2,  4, 330, 300, 'rect'),
-  (5, 'Sala',    2,  4, 330, 490, 'rect'),
-  (6, 'Sala',    4,  6, 580, 140, 'round'),
-  (7, 'Sala',    5,  8, 580, 410, 'rect'),
-  (8, 'Sala',    7, 10, 840, 300, 'rect'),
-  (1, 'Terraza', 1,  2, 150, 150, 'round'),
-  (2, 'Terraza', 2,  4, 420, 150, 'rect'),
-  (3, 'Terraza', 2,  4, 690, 150, 'rect'),
-  (4, 'Terraza', 4,  6, 420, 420, 'round');
-
-INSERT INTO dining_tables (number, zone, min_capacity, max_capacity, join_only) VALUES
-  (1, 'Extra', 1, 4, true),
-  (2, 'Extra', 1, 4, true);
-
--- Comidas 13:00-16:00 (780-960) y cenas 20:00-00:00 (1200-1440), de lunes a domingo.
-INSERT INTO service_slots (weekday, open_min, close_min) VALUES
-  (1, 780, 960), (1, 1200, 1440),
-  (2, 780, 960), (2, 1200, 1440),
-  (3, 780, 960), (3, 1200, 1440),
-  (4, 780, 960), (4, 1200, 1440),
-  (5, 780, 960), (5, 1200, 1440),
-  (6, 780, 960), (6, 1200, 1440),
-  (7, 780, 960), (7, 1200, 1440);
 
 INSERT INTO settings (name, value) VALUES
   ('duration_min',          120),  -- duración de reserva

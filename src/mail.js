@@ -187,9 +187,8 @@ function connection(text) {
   } catch {
     // no es una dirección
   }
-  // Solo HTTPS (RS-01); HTTP únicamente hacia esta máquina, para las pruebas.
-  const secure = url !== null && (url.protocol === 'https:'
-    || (url.protocol === 'http:' && ['127.0.0.1', 'localhost'].includes(url.hostname)));
+  // Solo HTTPS (RS-01).
+  const secure = url !== null && url.protocol === 'https:';
   if (!secure || key.length === 0) {
     throw new Error('mail.connection_string no es una cadena de conexión de Azure válida');
   }

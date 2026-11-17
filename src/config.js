@@ -32,7 +32,7 @@ function load() {
 
 /**
  * Objeto de configuración. Es mutable a propósito: los scripts de
- * configuración y las pruebas prueban valores nuevos antes de guardarlos.
+ * configuración prueban valores nuevos antes de guardarlos.
  */
 export const settings = load();
 

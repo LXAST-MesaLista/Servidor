@@ -11,8 +11,7 @@
   "scripts": {
     "start": "node src/server.js",
     "worker": "node bin/worker.js",
-    "worker:diario": "node bin/worker.js --diario",
-    "test:api": "node pruebas/run.js"
+    "worker:diario": "node bin/worker.js --diario"
   },
   "dependencies": {
     "argon2": "^0.41.1",

@@ -4,9 +4,6 @@ node_modules/
 # Configuración con secretos (cada servidor tiene la suya)
 config/config.json
 
-# Credenciales de las cuentas de desarrollo
-pruebas/dev-credentials.txt
-
 # Paquetes generados
 *.tar.gz
 *.log

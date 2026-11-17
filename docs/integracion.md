@@ -17,7 +17,6 @@ teléfono), pero la última palabra es siempre del servidor.
 | Entorno | Dirección base |
 |---|---|
 | Servidor de Azure | `https://mesalista.spaincentral.cloudapp.azure.com/api/v1` |
-| Desarrollo en local | `http://127.0.0.1:8091/api/v1` (ver el README) |
 
 - Todo va en JSON (`Content-Type: application/json`), salvo la descarga del CSV.
 - Solo HTTPS en el servidor: una petición por HTTP recibe una redirección.
@@ -201,16 +200,12 @@ configura en el servidor (`bin/configure-fcm.js`).
 El enlace del correo abre la página de la web (`front.reset`): la app solo tiene
 que llamar a `POST /auth/forgot`.
 
-## 7. Probar contra el servidor
+## 7. Antes de empezar a usarla
 
-- En local: el README explica cómo arrancar PostgreSQL y la API (Node.js) en el puerto 8091.
-- Cuentas de demostración: `node bin/seed-demo.js "<contraseña>"` crea
-  `recepcion@mesalista.test` (personal) y tres clientes, con reservas para mañana.
-- Un servidor de pruebas con `"test_clock": true` acepta la cabecera
-  `X-Test-Now: AAAA-MM-DD HH:MM:SS` para simular la hora (plazos, ventanas de
-  llegada). En el servidor real está desactivada.
-- La pasarela simulada (`"paypal": {"mode": "fake"}`) solo existe en un
-  servidor de pruebas.
+- La base de datos de producción nace sin mesas ni franjas de servicio: hasta
+  que la administración las da de alta, `GET /availability` devuelve una lista
+  vacía. Lo explica el README («Primeros pasos tras instalar»).
+- La API solo responde por HTTPS en el dominio del servidor de Azure.
 
 ## 8. Resumen para cada equipo
 

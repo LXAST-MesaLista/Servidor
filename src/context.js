@@ -24,7 +24,7 @@ export function newState(req = null) {
   };
 }
 
-// Fuera de una petición (scripts y pruebas) se usa un estado común.
+// Fuera de una petición (scripts de bin/) se usa un estado común.
 const fallback = { state: newState(), tx: null };
 
 /** { state, tx }: estado de la petición y cliente de la transacción abierta. */

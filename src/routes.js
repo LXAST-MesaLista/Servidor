@@ -22,7 +22,7 @@ import * as stats from './stats.js';
 import * as payments from './payments.js';
 import * as groups from './group-requests.js';
 import * as push from './push.js';
-import { Router, body, query, fail, apiUrl } from './http.js';
+import { Router, body, query, fail } from './http.js';
 
 export const router = new Router();
 const r = router;
@@ -189,14 +189,6 @@ r.add('POST', '/reservations/{id}/pay', async (p) => {
 
 // Vuelta desde PayPal (?token=<pedido>): cobra y redirige a la reserva en la web o la app.
 r.add('GET', '/payments/return', async () => ({ _redirect: await payments.handleReturn(query('token')) }));
-
-// Pasarela simulada (solo en el servidor de pruebas): «aprueba» y vuelve.
-r.add('GET', '/payments/fake-approve', async () => {
-  if (payments.mode() !== 'fake' || !payments.configured()) {
-    fail(404, 'not_found', 'Recurso no encontrado.');
-  }
-  return { _redirect: `${apiUrl()}/payments/return?token=${encodeURIComponent(query('token') ?? '')}` };
-});
 
 // RF-43: solicitudes de grupo.
 r.add('GET', '/group-requests/times', async () => ({ times: await groups.times(V.date(query('date'))) }));

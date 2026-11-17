@@ -187,7 +187,7 @@ export async function flush(limit = 50) {
 /** Envía un aviso a un dispositivo. Lanza PushGone, PushThrottled u otro error. */
 export async function send(deviceTokenValue, title, body, data = {}) {
   const c = config('fcm');
-  const url = `${checkedUrl(String(c.api ?? API))}/v1/projects/${encodeURIComponent(String(c.project_id))}/messages:send`;
+  const url = `${API}/v1/projects/${encodeURIComponent(String(c.project_id))}/messages:send`;
   const payload = {
     message: {
       token: deviceTokenValue,
@@ -236,8 +236,8 @@ export async function checkCredentials() {
 /** Token de acceso OAuth 2.0 de la cuenta de servicio; dura una hora. */
 async function accessToken() {
   const c = config('fcm');
-  const uri = checkedUrl(String(c.token_uri ?? TOKEN_URI));
-  const key = createHash('sha256').update(`${c.client_email}|${uri}|${c.private_key}`).digest('hex');
+  const uri = TOKEN_URI;
+  const key = createHash('sha256').update(`${c.client_email}|${c.private_key}`).digest('hex');
   const nowSec = Math.floor(Date.now() / 1000);
   if (access !== null && access.key === key && access.expires > nowSec + 60) {
     return access.token;
@@ -269,20 +269,6 @@ async function accessToken() {
   }
   access = { key, token: data.access_token, expires: nowSec + Number(data.expires_in ?? 3600) };
   return access.token;
-}
-
-/** Solo HTTPS; http únicamente hacia 127.0.0.1 o localhost (servidor falso de las pruebas). */
-function checkedUrl(url) {
-  let p;
-  try {
-    p = new URL(url);
-  } catch {
-    throw new Error('FCM: la dirección de Google debe ser https');
-  }
-  if (p.protocol !== 'https:' && !(p.protocol === 'http:' && ['127.0.0.1', 'localhost'].includes(p.hostname))) {
-    throw new Error('FCM: la dirección de Google debe ser https');
-  }
-  return url.replace(/\/+$/, '');
 }
 
 /** POST: [código HTTP, cuerpo]. */

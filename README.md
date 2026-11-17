@@ -54,18 +54,17 @@ src/
   config.js · context.js · clock.js · db.js · http.js · validate.js · settings.js · schedule.js
 bin/
   worker.js        Tareas de cron (no presentadas, señales, correos, push, limpieza diaria)
-  create-user.js · seed-demo.js
+  create-user.js   Crea cuentas del personal (la primera de administrador)
   configure-mail.js · configure-fcm.js · configure-paypal.js · write-config.js
 bd/
   esquema.sql      Tablas, vista, restricción contra solapamientos y procedimientos
-  datos.sql        Restaurante de pruebas: 12 mesas con plano + 2 extra, franjas, parámetros
+  datos.sql        Datos imprescindibles: parámetros del servicio y opciones de menú
 config/
   config.example.json   (config.json lo genera install.sh y no se sube a Git)
 data/common-passwords.txt
 despliegue/
   install.sh       Instalación completa en Azure (Ubuntu 24.04)
   apache-mesalista.conf, mesalista-api.service, permisos.sql, backup.sh, restore.sh
-pruebas/           run.js y servidores falsos de Azure y de Google
 docs/              openapi.yaml e integracion.md
 ```
 
@@ -78,12 +77,11 @@ docs/              openapi.yaml e integracion.md
 | `domain` | Dominio público, sin `https://` (etiqueta DNS de la IP pública de Azure) |
 | `qr_secret` | Clave de los QR (RS-07): 64 caracteres hexadecimales aleatorios. Si cambia, los QR emitidos dejan de valer |
 | `require_https` | RS-01: la API rechaza lo que no llega por HTTPS (Apache lo indica con `X-Forwarded-Proto`) |
-| `test_clock` | Reloj simulado con la cabecera `X-Test-Now`. **Nunca** en el servidor real |
 | `trusted_proxies` | Desde dónde se aceptan `X-Forwarded-For` y `X-Forwarded-Proto` (Apache y la web, en la misma máquina) |
 | `front` | Páginas de la web y de la app a las que el servidor envía al cliente: `reset` (RF-40), `payment_web`, `payment_app` y `payment_unknown` (RF-44). `{token}`, `{id}` y `{result}` se sustituyen |
 | `mail` | Azure Communication Services Email (`bin/configure-mail.js`). Sin cadena de conexión, los correos esperan en `email_outbox` |
 | `fcm` | Cuenta de servicio de Firebase para los avisos push (`bin/configure-fcm.js`) |
-| `paypal` | Claves de PayPal **sandbox** (`bin/configure-paypal.js`); `"mode": "fake"` es la pasarela simulada de las pruebas |
+| `paypal` | Claves de PayPal **sandbox** (`bin/configure-paypal.js`). Sin claves, los grupos aceptados se confirman sin señal |
 
 ## Instalación en Azure
 
@@ -151,52 +149,22 @@ de Apache y pide el certificado para el nuevo nombre.
 Los cambios futuros del esquema necesitarán scripts de migración: `install.sh`
 solo carga `esquema.sql` en una base de datos vacía o con `--reset-db`.
 
-## Desarrollo en local
+## Primeros pasos tras instalar
 
-1. Node.js 20 o superior y PostgreSQL 16. La base de datos debe pertenecer al
-   usuario que carga el esquema (crea las extensiones `btree_gist` y `unaccent`):
+La base de datos nace solo con los parámetros del servicio y las opciones de
+menú (`bd/datos.sql`): **no hay mesas ni horarios** hasta que el administrador
+los define. Con la cuenta creada por `install.sh`, desde el panel o con la API
+(`/api/v1/admin/*`, ver `docs/openapi.yaml`):
 
-   ```bash
-   psql -U postgres -c "CREATE ROLE mesalista LOGIN PASSWORD '<contraseña>';"
-   psql -U postgres -c "CREATE DATABASE mesalista OWNER mesalista ENCODING 'UTF8' TEMPLATE template0;"
-   psql -U mesalista -d mesalista -f bd/esquema.sql
-   psql -U mesalista -d mesalista -f bd/datos.sql
-   ```
+1. **Mesas** (`POST /admin/tables`): número, zona (su inicial forma el código:
+   S-1, T-1…), capacidad mínima y máxima, y si es una mesa extra solo para unir.
+2. **Plano** (`PUT /admin/tables/layout`): posición y forma de cada mesa.
+3. **Franjas de servicio** (`PUT /admin/schedule/slots`) y días cerrados.
+4. **Parámetros** (`PUT /admin/settings`): duración, antelación, comensales, señal…
+5. **PIN de «Cerrar local»** (`PUT /admin/close-pin`).
+6. **Cuentas del personal** (`POST /admin/staff`).
 
-   `esquema.sql` borra y crea todas las tablas.
-2. `npm install`.
-3. Copia `config/config.example.json` como `config/config.json`, pon la
-   contraseña de la base de datos y un `qr_secret` de 64 caracteres
-   (`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`)
-   y, para desarrollo, `"require_https": false`, `"test_clock": true` y
-   `"paypal": {"mode": "fake"}`.
-4. Arranca la API: `npm start` (escucha en `http://127.0.0.1:8091/api/v1/`).
-5. Cuentas: `node bin/create-user.js admin admin@mesalista.test "Administración"`
-   o las de demostración con `node bin/seed-demo.js "<contraseña>"`.
-
-## Pruebas automáticas
-
-`pruebas/run.js` ejecuta los casos CP-01 a CP-28 y CP-35 (avisos push; CP-29 a
-CP-34 son pruebas manuales) contra la API con un reloj simulado. **Borra todos
-los datos**, así que solo se usa en local o en un servidor de pruebas con
-`"test_clock": true` y la pasarela simulada (`"paypal": {"mode": "fake"}`):
-
-```bash
-node pruebas/run.js http://127.0.0.1:8091 --yes
-node pruebas/run.js http://127.0.0.1:8091 --yes --only=CP-06,CP-23
-```
-
-En un servidor de pruebas instalado con `install.sh`, el usuario de la API no
-puede vaciar tablas; antes hay que dárselo y ejecutar las pruebas con su config:
-
-```bash
-sudo -u postgres psql -d mesalista -c "GRANT TRUNCATE ON ALL TABLES IN SCHEMA public TO mesalista"
-sudo ML_CONFIG=/opt/mesalista-servidor/config/config.json node pruebas/run.js https://<dominio> --yes
-```
-
-El correo se prueba contra `pruebas/azure-stub.js` y los avisos push contra
-`pruebas/fcm-stub.js`: servidores falsos que comprueban las firmas como Azure
-y como Google.
+Hasta que haya mesas y franjas, la disponibilidad sale vacía y no se puede reservar.
 
 ## La API en resumen
 

@@ -1,4 +1,4 @@
-// RF-44: señal de los grupos grandes con PayPal en modo de pruebas.
+// RF-44: señal de los grupos grandes con PayPal.
 //
 // Reglas:
 //  - Solo pagan señal las solicitudes de grupo aceptadas: deposit_per_person ×
@@ -13,7 +13,6 @@
 //    restaurante; fuera de plazo, no. Las devoluciones se apuntan en la misma
 //    transacción que la cancelación y se envían después (y por cron si fallan).
 
-import { randomBytes } from 'node:crypto';
 import * as db from './db.js';
 import * as clock from './clock.js';
 import * as settings from './settings.js';
@@ -26,15 +25,8 @@ import { fail, apiUrl, frontUrl } from './http.js';
 
 export const CURRENCY = 'EUR';
 
-export function mode() {
-  return config('paypal.mode', 'sandbox') === 'fake' ? 'fake' : 'paypal';
-}
-
-/** ¿Hay pasarela configurada? La simulada solo existe en el servidor de pruebas. */
+/** ¿Hay pasarela configurada (claves de PayPal en config.json)? */
 export function configured() {
-  if (mode() === 'fake') {
-    return config('test_clock') === true;
-  }
   return String(config('paypal.client_id', '')) !== '' && String(config('paypal.secret', '')) !== '';
 }
 
@@ -44,7 +36,7 @@ export async function enabled() {
 }
 
 export function gateway() {
-  return mode() === 'fake' ? fakeGateway : payPalGateway;
+  return payPalGateway;
 }
 
 /** Pago capturado de una reserva, o null. */
@@ -93,8 +85,8 @@ export async function start(user, reservationId, from = 'web') {
   );
   await db.exec(
     `INSERT INTO payments (reservation_id, provider, order_id, amount_cents, currency, status, return_to, created_at)
-     VALUES (?, ?, ?, ?, ?, 'created', ?, ?)`,
-    [reservationId, mode(), order.id, r.deposit_cents, CURRENCY, from, clock.sql()],
+     VALUES (?, 'paypal', ?, ?, ?, 'created', ?, ?)`,
+    [reservationId, order.id, r.deposit_cents, CURRENCY, from, clock.sql()],
   );
   return order.approve_url;
 }
@@ -313,23 +305,4 @@ const payPalGateway = {
       throw new Error(`PayPal: devolución ${data.status ?? 'desconocida'}`);
     }
   },
-};
-
-/**
- * Pasarela simulada para las pruebas automáticas (solo con test_clock):
- * «aprobar» redirige directamente a la vuelta, y cobrar y devolver siempre
- * salen bien.
- */
-const fakeGateway = {
-  async createOrder() {
-    const id = `FAKE-${randomBytes(8).toString('hex')}`;
-    return { id, approve_url: `${apiUrl()}/payments/fake-approve?token=${id}` };
-  },
-
-  async captureOrder(orderId) {
-    const amount = await db.value('SELECT amount_cents FROM payments WHERE order_id = ?', [orderId]);
-    return { status: 'COMPLETED', capture_id: `FAKECAP-${orderId.slice(5)}`, amount_cents: Number(amount) };
-  },
-
-  async refundCapture() {},
 };

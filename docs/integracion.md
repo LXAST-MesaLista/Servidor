@@ -202,9 +202,9 @@ que llamar a `POST /auth/forgot`.
 
 ## 7. Antes de empezar a usarla
 
-- La base de datos de producción nace sin mesas ni franjas de servicio: hasta
-  que la administración las da de alta, `GET /availability` devuelve una lista
-  vacía. Lo explica el README («Primeros pasos tras instalar»).
+- El servidor se instala con el restaurante ya configurado (14 mesas, plano y
+  franjas de comida y cena): se puede reservar desde el primer momento. Lo
+  explica el README («Restaurante preconfigurado»).
 - La API solo responde por HTTPS en el dominio del servidor de Azure.
 
 ## 8. Resumen para cada equipo

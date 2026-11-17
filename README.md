@@ -55,10 +55,12 @@ src/
 bin/
   worker.js        Tareas de cron (no presentadas, señales, correos, push, limpieza diaria)
   create-user.js   Crea cuentas del personal (la primera de administrador)
+  set-close-pin.js Fija el PIN de «Cerrar local» (lo usa install.sh)
   configure-mail.js · configure-fcm.js · configure-paypal.js · write-config.js
 bd/
   esquema.sql      Tablas, vista, restricción contra solapamientos y procedimientos
   datos.sql        Datos imprescindibles: parámetros del servicio y opciones de menú
+  restaurante.sql  Configuración inicial del local: 14 mesas con plano y franjas de servicio
 config/
   config.example.json   (config.json lo genera install.sh y no se sube a Git)
 data/common-passwords.txt
@@ -149,22 +151,23 @@ de Apache y pide el certificado para el nuevo nombre.
 Los cambios futuros del esquema necesitarán scripts de migración: `install.sh`
 solo carga `esquema.sql` en una base de datos vacía o con `--reset-db`.
 
-## Primeros pasos tras instalar
+## Restaurante preconfigurado
 
-La base de datos nace solo con los parámetros del servicio y las opciones de
-menú (`bd/datos.sql`): **no hay mesas ni horarios** hasta que el administrador
-los define. Con la cuenta creada por `install.sh`, desde el panel o con la API
-(`/api/v1/admin/*`, ver `docs/openapi.yaml`):
+La instalación deja el restaurante listo para reservar. La primera vez carga
+`bd/restaurante.sql` (solo si aún no hay ninguna mesa ni franja) y pide el PIN
+de «Cerrar local»:
 
-1. **Mesas** (`POST /admin/tables`): número, zona (su inicial forma el código:
-   S-1, T-1…), capacidad mínima y máxima, y si es una mesa extra solo para unir.
-2. **Plano** (`PUT /admin/tables/layout`): posición y forma de cada mesa.
-3. **Franjas de servicio** (`PUT /admin/schedule/slots`) y días cerrados.
-4. **Parámetros** (`PUT /admin/settings`): duración, antelación, comensales, señal…
-5. **PIN de «Cerrar local»** (`PUT /admin/close-pin`).
-6. **Cuentas del personal** (`POST /admin/staff`).
+| Qué | Configuración inicial |
+|---|---|
+| Mesas | Sala S-1 a S-8 y terraza T-1 a T-4 (de 2 a 10 plazas), con su sitio en el plano; extra E-1 y E-2 (4 plazas) solo para unir |
+| Franjas | Comidas de 13:00 a 16:00 y cenas de 20:00 a 00:00, todos los días |
+| Parámetros | Reservas de 2 horas, de 1 a 10 comensales, grupos hasta 40, señal de 5 € por persona… (`bd/datos.sql`) |
+| Menú | Sin gluten, vegetariano, vegano y sin lactosa |
+| Cuentas | El administrador (lo pide `install.sh`); el personal se da de alta en el panel |
 
-Hasta que haya mesas y franjas, la disponibilidad sale vacía y no se puede reservar.
+Para otro local, **edita `bd/restaurante.sql` antes de instalar** (el archivo
+explica cada valor). Una vez instalado, todo se cambia desde el panel, en
+Administración, o con la API (`/api/v1/admin/*`, ver `docs/openapi.yaml`).
 
 ## La API en resumen
 

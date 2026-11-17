@@ -222,7 +222,14 @@ SQL
 HAS_TABLES=$(psql_admin -tA -d "$DB_NAME" -c "SELECT to_regclass('public.reservations') IS NOT NULL")
 if [[ "$HAS_TABLES" != "t" ]]; then
     psql_owner "$REPO_DIR/bd/esquema.sql" "$REPO_DIR/bd/datos.sql"
-    echo "Base de datos creada (sin mesas ni horarios: se configuran en Administración)."
+    echo "Base de datos creada."
+fi
+# Restaurante preconfigurado (bd/restaurante.sql: mesas, plano y franjas), solo
+# si todavía no hay ninguna mesa ni franja: nunca pisa lo que ya se ha configurado.
+EMPTY=$(psql_admin -tA -d "$DB_NAME" -c "SELECT NOT EXISTS (SELECT 1 FROM dining_tables) AND NOT EXISTS (SELECT 1 FROM service_slots)")
+if [[ "$EMPTY" == "t" ]]; then
+    psql_owner "$REPO_DIR/bd/restaurante.sql"
+    echo "Restaurante configurado: $(psql_admin -tA -d "$DB_NAME" -c "SELECT COUNT(*) FROM dining_tables") mesas y $(psql_admin -tA -d "$DB_NAME" -c "SELECT COUNT(*) FROM service_slots") franjas de servicio."
 fi
 psql_admin -d "$DB_NAME" -f - < "$REPO_DIR/despliegue/permisos.sql"
 
@@ -406,6 +413,13 @@ if [[ "$ADMINS" == "0" ]]; then
     sudo -u "$APP_USER" "$NODE_BIN" "$APP_DIR/bin/create-user.js" admin "$ADMIN_EMAIL" "Administrador"
 fi
 
+# PIN de «Cerrar local» (se pide solo la primera vez).
+HAS_PIN=$(psql_admin -tA -d "$DB_NAME" -c "SELECT EXISTS (SELECT 1 FROM secrets WHERE name = 'close_pin')")
+if [[ "$HAS_PIN" != "t" ]]; then
+    say "PIN de «Cerrar local»"
+    sudo -u "$APP_USER" "$NODE_BIN" "$APP_DIR/bin/set-close-pin.js"
+fi
+
 # ---------------------------------------------------------------------------
 # Comprobación final: la API responde por HTTPS desde la propia máquina.
 # ---------------------------------------------------------------------------
@@ -440,6 +454,7 @@ cat <<EOF
     sudo node ${APP_DIR}/bin/configure-paypal.js
   Después de cambiar las claves: sudo systemctl restart mesalista-api
 
-  Siguiente paso: entra en el panel como ${ADMIN_EMAIL} y, en Administración,
-  da de alta las mesas, el plano, las franjas de servicio y el PIN de «Cerrar local».
+  El restaurante ya está configurado (bd/restaurante.sql): se puede reservar.
+  Las mesas, el plano, los horarios y las cuentas del personal se cambian en
+  el panel, en Administración (entrando como ${ADMIN_EMAIL}).
 EOF

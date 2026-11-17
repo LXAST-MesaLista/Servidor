@@ -2,8 +2,8 @@
 --
 -- Solo lo que la API necesita para arrancar: los parámetros del servicio con
 -- sus valores iniciales (tabla «Reglas del servicio») y unas opciones de menú
--- habituales. Las mesas, su plano, las franjas de servicio y los días
--- cerrados los define el administrador desde el panel (Administración).
+-- habituales. Las mesas, su plano y las franjas de servicio están en
+-- restaurante.sql.
 --
 -- Las cuentas no van aquí porque sus contraseñas se guardan con Argon2id: la
 -- primera de administrador la crea install.sh con bin/create-user.js.

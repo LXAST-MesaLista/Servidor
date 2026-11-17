@@ -1,0 +1,40 @@
+# MesaLista · servicio de la API (Node.js)
+# install.sh sustituye __APP_DIR__ y __NODE__ y lo copia en
+# /etc/systemd/system/mesalista-api.service.
+
+[Unit]
+Description=MesaLista · API REST
+Documentation=https://github.com/LXPT-UIB/Servidor
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mesalista
+Group=mesalista
+WorkingDirectory=__APP_DIR__
+Environment=NODE_ENV=production
+Environment=TZ=Europe/Madrid
+ExecStart=__NODE__ __APP_DIR__/src/server.js
+# RD-02: el servicio vuelve a arrancar solo si se cae.
+Restart=always
+RestartSec=2
+# Sus mensajes van al diario: journalctl -u mesalista-api
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mesalista-api
+
+# Endurecimiento: sin privilegios, sin escribir fuera de lo necesario.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadOnlyPaths=__APP_DIR__
+
+[Install]
+WantedBy=multi-user.target

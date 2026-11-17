@@ -1,7 +1,7 @@
 # MesaLista · Servidor
 
 Servidor del servicio de reserva de mesas MesaLista: API REST en **Node.js** con
-**PostgreSQL 16**, detrás de **Apache** (HTTPS), en una máquina virtual de Azure
+**PostgreSQL 16**, detrás de **nginx** (HTTPS), en una máquina virtual de Azure
 con Ubuntu Server 24.04. Es una de las tres partes del proyecto:
 
 | Parte | Cómo se conecta |
@@ -20,7 +20,7 @@ las rutas.
 ## Arquitectura
 
 ```
-Internet ──HTTPS──▶ Apache (TLS, cabeceras de seguridad)
+Internet ──HTTPS──▶ nginx (TLS, cabeceras de seguridad)
                        ├── /api/v1/*  ──HTTP──▶ Node.js (mesalista-api, 127.0.0.1:8091) ──▶ PostgreSQL 16
                        └── /          ──────▶ web (/var/www/mesalista-web)
 cron ──▶ bin/worker.js (cada minuto y a diario)
@@ -68,7 +68,7 @@ data/common-passwords.txt
 despliegue/
   install.sh       Instalación completa en Azure (Ubuntu 24.04)
   mesalista        Comando de administración (se instala en /usr/local/bin)
-  apache-mesalista.conf, mesalista-api.service, permisos.sql, backup.sh, restore.sh
+  nginx-mesalista.conf, mesalista-api.service, permisos.sql, backup.sh, restore.sh
 docs/              openapi.yaml e integracion.md
 ```
 
@@ -80,8 +80,8 @@ docs/              openapi.yaml e integracion.md
 | `db` | Conexión a PostgreSQL |
 | `domain` | Dominio público, sin `https://` (etiqueta DNS de la IP pública de Azure) |
 | `qr_secret` | Clave de los QR (RS-07): 64 caracteres hexadecimales aleatorios. Si cambia, los QR emitidos dejan de valer |
-| `require_https` | RS-01: la API rechaza lo que no llega por HTTPS (Apache lo indica con `X-Forwarded-Proto`) |
-| `trusted_proxies` | Desde dónde se aceptan `X-Forwarded-For` y `X-Forwarded-Proto` (Apache y la web, en la misma máquina) |
+| `require_https` | RS-01: la API rechaza lo que no llega por HTTPS (nginx lo indica con `X-Forwarded-Proto`) |
+| `trusted_proxies` | Desde dónde se aceptan `X-Forwarded-For` y `X-Forwarded-Proto` (nginx y la web, en la misma máquina) |
 | `front` | Páginas de la web y de la app a las que el servidor envía al cliente: `reset` (RF-40), `payment_web`, `payment_app` y `payment_unknown` (RF-44). `{token}`, `{id}` y `{result}` se sustituyen |
 | `mail` | Azure Communication Services Email (`bin/configure-mail.js`). Sin cadena de conexión, los correos esperan en `email_outbox` |
 | `fcm` | Cuenta de servicio de Firebase para los avisos push (`bin/configure-fcm.js`) |
@@ -99,7 +99,7 @@ docs/              openapi.yaml e integracion.md
    cd ~/Servidor && sudo bash despliegue/install.sh
    ```
 
-   Instala Node.js (NodeSource), PostgreSQL, Apache y certbot. Pide el dominio,
+   Instala Node.js (NodeSource), PostgreSQL, nginx y certbot. Pide el dominio,
    un correo para Let's Encrypt, el correo del administrador y (la primera vez)
    la cadena de conexión y el remitente de Azure Communication Services; se
    pueden dejar en blanco. Al final, la contraseña del administrador. El dominio
@@ -121,7 +121,7 @@ Queda así:
 
 | Qué | Dónde |
 |---|---|
-| API | `https://<dominio>/api/v1/` → Apache → `mesalista-api.service` (Node.js en `127.0.0.1:8091`) |
+| API | `https://<dominio>/api/v1/` → nginx → `mesalista-api.service` (Node.js en `127.0.0.1:8091`) |
 | Código y `config.json` | `/opt/mesalista-servidor` (dueño `root`, grupo `mesalista`) |
 | Raíz de la web (la instala [MesaLista-web](https://github.com/LXPT-UIB/MesaLista-web)) | `/var/www/mesalista-web`, con sus directivas de Apache en `/etc/apache2/mesalista-web.d/` |
 | Base de datos | PostgreSQL 16 solo en local; dueño `mesalista_owner`, la API entra como `mesalista` (solo lee y escribe datos) |
@@ -155,7 +155,7 @@ en ella con el usuario normal, y conviene usar siempre `sudo mesalista …`.
 **Cambiar de dominio:** poner la nueva etiqueta DNS en Azure y ejecutar
 `sudo bash despliegue/install.sh --dominio <nuevo>`. Cambia `domain` y las
 direcciones de la web en `config.json` (el resto se conserva), rehace el sitio
-de Apache y pide el certificado para el nuevo nombre.
+de nginx y pide el certificado para el nuevo nombre.
 
 **Si falla PostgreSQL durante la instalación:**
 

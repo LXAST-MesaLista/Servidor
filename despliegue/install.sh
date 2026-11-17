@@ -13,15 +13,17 @@
 # Queda así en el servidor:
 #   /opt/mesalista-servidor          la API (src/, bin/, node_modules/) y config/config.json
 #   mesalista-api.service            el proceso de Node.js, en 127.0.0.1:8091
-#   Apache                           HTTPS en https://<dominio>/api/v1/ → Node.js
-#   /var/www/mesalista-web           raíz de la web (la instala su propio proyecto)
+#   nginx                            HTTPS en https://<dominio>/api/v1/ → Node.js
+#                                    (con la web de LXPT-UIB/WEB instalada, su sitio)
 
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_DIR=/opt/mesalista-servidor
 CONFIG=$APP_DIR/config/config.json
-WEB_DIR=/var/www/mesalista-web
+WEB_APP_DIR=/opt/mesalista-web
+WEB_PORT=8092
+SITE=/etc/nginx/sites-available/mesalista
 LIB_DIR=/usr/local/lib/mesalista
 ETC_DIR=/etc/mesalista
 ENV_FILE=$ETC_DIR/install.env
@@ -144,11 +146,18 @@ if [[ $(awk '/MemTotal/ { print $2 }' /proc/meminfo) -lt 1600000 && -z "$(swapon
 fi
 timedatectl set-timezone Europe/Madrid
 timedatectl set-ntp true || true
+# Apache (instalaciones anteriores) ocuparía los puertos 80 y 443 y el paquete
+# de nginx no podría arrancarlo al instalarse: se detiene y se desactiva antes.
+if systemctl is-enabled --quiet apache2 2>/dev/null || systemctl is-active --quiet apache2 2>/dev/null; then
+    warn "Apache estaba activo: se detiene y se desactiva; nginx atiende ahora el dominio."
+    systemctl disable --now apache2 >/dev/null 2>&1 || true
+fi
+rm -rf /etc/systemd/system/apache2.service.d/mesalista-restart.conf
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
 # postgresql-contrib trae las extensiones btree_gist y unaccent que usa el esquema.
 apt-get install -y -q \
-    apache2 postgresql postgresql-contrib certbot ufw curl rsync cron openssl ca-certificates gnupg
+    nginx postgresql postgresql-contrib certbot ufw curl rsync cron openssl ca-certificates gnupg
 
 # Node.js LTS del repositorio de NodeSource (el de Ubuntu 24.04 es demasiado antiguo).
 if ! command -v node >/dev/null || (( $(node -p 'process.versions.node.split(".")[0]') < 20 )); then
@@ -237,7 +246,7 @@ psql_admin -d "$DB_NAME" -f - < "$REPO_DIR/despliegue/permisos.sql"
 # Código de la aplicación
 # ---------------------------------------------------------------------------
 say "API en $APP_DIR"
-mkdir -p "$APP_DIR/config" "$WEB_DIR" "$LIB_DIR"
+mkdir -p "$APP_DIR/config" "$LIB_DIR"
 for dir in src bin data; do
     rsync -a --delete "$REPO_DIR/$dir/" "$APP_DIR/$dir/"
 done
@@ -280,18 +289,12 @@ mkdir -p /var/log/mesalista
 chown "$APP_USER":"$APP_USER" /var/log/mesalista
 chmod 750 /var/log/mesalista
 
-# Raíz de la web: la rellena el proyecto de la web. Mientras está vacía, una
-# página que lo explica.
-if [[ -z "$(ls -A "$WEB_DIR")" ]]; then
-    cat > "$WEB_DIR/index.html" <<'EOF'
-<!doctype html>
-<html lang="es"><meta charset="utf-8"><title>MesaLista</title>
-<p>La API de MesaLista funciona en <code>/api/v1/</code>. La web todavía no está instalada.</p>
-</html>
-EOF
-    chown -R root:www-data "$WEB_DIR"
+# Restos de la instalación con Apache: la raíz con la página provisional y la
+# carpeta de directivas de la web, si siguen vacías.
+if [[ -d /var/www/mesalista-web ]] && { [[ -z "$(ls -A /var/www/mesalista-web)" ]]         || { [[ "$(ls -A /var/www/mesalista-web)" == "index.html" ]] && grep -q 'La web todavía no está instalada' /var/www/mesalista-web/index.html; }; }; then
+    rm -rf /var/www/mesalista-web
 fi
-mkdir -p /etc/apache2/mesalista-web.d
+rmdir /etc/apache2/mesalista-web.d 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
 # Servicio de la API (systemd)
@@ -301,19 +304,22 @@ sed -e "s#__APP_DIR__#${APP_DIR}#g" -e "s#__NODE__#${NODE_BIN}#g" \
     "$REPO_DIR/despliegue/mesalista-api.service" > /etc/systemd/system/mesalista-api.service
 
 # RD-02: los servicios vuelven a arrancar solos si se caen.
-for svc in apache2 "postgresql@${PG_VER}-main"; do
+for svc in nginx "postgresql@${PG_VER}-main"; do
     mkdir -p "/etc/systemd/system/${svc}.service.d"
     printf '[Service]\nRestart=always\nRestartSec=2\n' > "/etc/systemd/system/${svc}.service.d/mesalista-restart.conf"
 done
 systemctl daemon-reload
-systemctl enable apache2 postgresql cron mesalista-api >/dev/null
+systemctl enable nginx postgresql cron mesalista-api >/dev/null
 systemctl restart mesalista-api cron
 
 # ---------------------------------------------------------------------------
-# Apache (RS-01). Mientras no hay certificado de Let's Encrypt arranca con uno
+# nginx (RS-01). Mientras no hay certificado de Let's Encrypt arranca con uno
 # autofirmado, para poder servir el desafío HTTP por el puerto 80.
+# El sitio es uno solo para la API y la web: si la web (LXPT-UIB/WEB) ya está
+# instalada se genera con su plantilla, que incluye la API; si no, con la de
+# este repositorio, solo con la API. Así no se pisa el sitio de la web.
 # ---------------------------------------------------------------------------
-say "Apache"
+say "nginx"
 LE_CERT="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
 LE_KEY="/etc/letsencrypt/live/$DOMAIN/privkey.pem"
 # Uno por dominio: si el dominio cambia, se crea otro con el nombre nuevo.
@@ -323,10 +329,17 @@ ACME_DIR=/var/www/letsencrypt
 CERT_OK=0
 [[ -f "$LE_CERT" ]] && CERT_OK=1   # ya existe; certbot lo renueva solo
 
+SITE_TEMPLATE="$REPO_DIR/despliegue/nginx-mesalista.conf"
+WEB_TEMPLATE="$WEB_APP_DIR/despliegue/nginx-mesalista.conf"
+if [[ -f "$WEB_TEMPLATE" ]]; then
+    SITE_TEMPLATE=$WEB_TEMPLATE
+    echo "Web instalada: el sitio se genera con su plantilla ($WEB_TEMPLATE)."
+fi
 render_site() {  # render_site CERT KEY
-    sed -e "s#__DOMAIN__#${DOMAIN}#g" -e "s#__WEB_DIR__#${WEB_DIR}#g" -e "s#__API_PORT__#${API_PORT}#g" \
-        -e "s#__ACME_DIR__#${ACME_DIR}#g" -e "s#__CERT__#$1#g" -e "s#__KEY__#$2#g" \
-        "$REPO_DIR/despliegue/apache-mesalista.conf" > /etc/apache2/sites-available/mesalista.conf
+    sed -e "s#__DOMAIN__#${DOMAIN}#g" -e "s#__APP_DIR__#${WEB_APP_DIR}#g" -e "s#__ACME_DIR__#${ACME_DIR}#g" \
+        -e "s#__WEB_PORT__#${WEB_PORT}#g" -e "s#__API_PORT__#${API_PORT}#g" \
+        -e "s#__CERT__#$1#g" -e "s#__KEY__#$2#g" \
+        "$SITE_TEMPLATE" > "$SITE"
 }
 if [[ $CERT_OK -eq 0 && ! -f "$SELF_CERT" ]]; then
     openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj "/CN=$DOMAIN" \
@@ -335,12 +348,11 @@ if [[ $CERT_OK -eq 0 && ! -f "$SELF_CERT" ]]; then
 fi
 mkdir -p "$ACME_DIR/.well-known/acme-challenge"
 
-a2enmod -q ssl headers proxy proxy_http http2 deflate >/dev/null
 if [[ $CERT_OK -eq 1 ]]; then render_site "$LE_CERT" "$LE_KEY"; else render_site "$SELF_CERT" "$SELF_KEY"; fi
-a2dissite -q 000-default default-ssl 2>/dev/null || true
-a2ensite -q mesalista >/dev/null
-apache2ctl configtest
-systemctl restart apache2
+ln -sf "$SITE" /etc/nginx/sites-enabled/mesalista
+rm -f /etc/nginx/sites-enabled/default
+nginx -t
+systemctl restart nginx
 
 # ---------------------------------------------------------------------------
 # Cortafuegos: 80 y 443 desde fuera (RS-10) y SSH para administrar la máquina.
@@ -375,13 +387,13 @@ if [[ $CERT_OK -eq 0 ]]; then
             --agree-tos --non-interactive --keep-until-expiring; then
         CERT_OK=1
         render_site "$LE_CERT" "$LE_KEY"
-        apache2ctl configtest
-        systemctl reload apache2
+        nginx -t
+        systemctl reload nginx
     fi
 fi
 if [[ $CERT_OK -eq 1 ]]; then
     mkdir -p /etc/letsencrypt/renewal-hooks/deploy
-    printf '#!/bin/sh\nsystemctl reload apache2\n' > /etc/letsencrypt/renewal-hooks/deploy/mesalista-reload.sh
+    printf '#!/bin/sh\nsystemctl reload nginx\n' > /etc/letsencrypt/renewal-hooks/deploy/mesalista-reload.sh
     chmod 755 /etc/letsencrypt/renewal-hooks/deploy/mesalista-reload.sh
 else
     warn "No se ha podido obtener el certificado de Let's Encrypt para $DOMAIN."
@@ -450,14 +462,14 @@ if [[ "$CODIGO" == "200" ]]; then
     echo "La API responde en https://$DOMAIN/api/v1/config."
 else
     warn "La API no responde como se esperaba (código ${CODIGO:-sin respuesta})."
-    warn "Revisa journalctl -u mesalista-api y /var/log/apache2/mesalista-error.log."
+    warn "Revisa journalctl -u mesalista-api y /var/log/nginx/mesalista-error.log."
 fi
 
 say "Listo"
 cat <<EOF
   API:               https://${DOMAIN}/api/v1/config
   Comprobarlo todo:  sudo mesalista estado      (mensajes: sudo mesalista logs)
-  Raíz de la web:    ${WEB_DIR}   (y sus directivas de Apache en /etc/apache2/mesalista-web.d/)
+  Sitio de nginx:    ${SITE}   (la web, LXPT-UIB/WEB, se instala aparte)
   Configuración:     ${CONFIG}
   Copias:            /var/backups/mesalista (diarias a las 03:30)
 

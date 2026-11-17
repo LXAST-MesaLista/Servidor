@@ -4,7 +4,7 @@
 // prueba. Las claves se escriben aquí, en el servidor; no se muestran en
 // pantalla ni se guardan en ningún otro sitio.
 //
-//   sudo node /opt/mesalista-servidor/bin/configure-mail.js
+//   sudo mesalista correo
 //   («no» como cadena de conexión = desactivar el envío: los correos se quedan
 //   en email_outbox)
 
@@ -61,7 +61,7 @@ run(async () => {
 
   saveConfig({ ...settings, mail: current }, 'configure-mail.js');
   console.log(current.enabled
-    ? 'Guardado. Reinicia la API para aplicarlo: sudo systemctl restart mesalista-api (el worker lo usa en su siguiente vuelta).'
+    ? 'Guardado. Se aplica al reiniciar la API (sudo mesalista reiniciar); el worker lo usa en su siguiente vuelta.'
     : 'Correo desactivado: los correos se quedan en email_outbox.');
   return 0;
 });

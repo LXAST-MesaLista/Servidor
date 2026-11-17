@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# MesaLista · comando de administración del servidor
+# install.sh lo instala en /usr/local/bin/mesalista. Funciona desde cualquier
+# carpeta: se coloca en /opt/mesalista-servidor y ejecuta cada script con el
+# usuario adecuado (mesalista para los datos, root para tocar config.json).
+#
+#   sudo mesalista estado                         servicio, argon2, base de datos y API
+#   sudo mesalista logs                           últimos mensajes de la API
+#   sudo mesalista reiniciar                      reinicia la API (tras cambiar config.json)
+#   sudo mesalista usuario admin|staff <correo> "<nombre>"
+#   sudo mesalista pin                            cambia el PIN de «Cerrar local»
+#   sudo mesalista correo                         Azure Communication Services
+#   sudo mesalista push <cuenta-de-servicio.json> Firebase Cloud Messaging («no» = desactivar)
+#   sudo mesalista paypal                         claves de PayPal sandbox
+#   sudo mesalista worker [--diario]              tareas de cron a mano
+
+set -euo pipefail
+
+APP_DIR=/opt/mesalista-servidor
+APP_USER=mesalista
+CONFIG=$APP_DIR/config/config.json
+
+if [[ $EUID -ne 0 ]]; then
+    exec sudo "$0" "$@"
+fi
+
+ayuda() { sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; }
+
+# Rutas que da el usuario (p. ej. el JSON de Firebase) se resuelven antes de
+# cambiar de carpeta.
+ARGS=("$@")
+cd "$APP_DIR"
+
+NODE=$(command -v node)
+como_app() { sudo -u "$APP_USER" "$NODE" "$@"; }
+reiniciar() { systemctl restart mesalista-api && echo "API reiniciada."; }
+
+case "${ARGS[0]:-}" in
+    estado)
+        ok=1
+        if systemctl is-active --quiet mesalista-api; then
+            echo "✔ servicio mesalista-api en marcha"
+        else
+            echo "✘ servicio mesalista-api parado (sudo mesalista logs)"; ok=0
+        fi
+        if como_app -e "require('$APP_DIR/node_modules/argon2').hash('x').then(() => process.exit(0), () => process.exit(1))" 2>/dev/null; then
+            echo "✔ argon2 carga"
+        else
+            echo "✘ argon2 no carga (vuelve a ejecutar install.sh)"; ok=0
+        fi
+        # postgres no puede entrar en esta carpeta: psql se lanza desde «/».
+        MESAS=$(cd / && sudo -u postgres psql -X -tA -d mesalista -c "SELECT COUNT(*) FROM dining_tables WHERE active AND deleted_at IS NULL" 2>/dev/null || true)
+        if [[ "$MESAS" =~ ^[0-9]+$ ]]; then
+            echo "✔ base de datos: ${MESAS} mesas activas"
+        else
+            echo "✘ no se puede consultar la base de datos"; ok=0
+        fi
+        DOMAIN=$("$NODE" -e "process.stdout.write(JSON.parse(require('fs').readFileSync('$CONFIG','utf8')).domain ?? '')")
+        CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/api/v1/config" || true)
+        if [[ "$CODE" == "200" ]]; then
+            echo "✔ API: https://$DOMAIN/api/v1/config responde"
+        else
+            echo "✘ API: https://$DOMAIN/api/v1/config responde ${CODE:-sin respuesta}"; ok=0
+        fi
+        (( ok )) ;;
+    logs)
+        journalctl -u mesalista-api -n 50 --no-pager ;;
+    reiniciar)
+        reiniciar ;;
+    usuario)
+        como_app bin/create-user.js "${ARGS[@]:1}" ;;
+    pin)
+        como_app bin/set-close-pin.js ;;
+    correo)
+        "$NODE" bin/configure-mail.js && reiniciar ;;
+    push)
+        archivo=${ARGS[1]:-}
+        if [[ -n "$archivo" && "${archivo,,}" != "no" ]]; then
+            archivo=$(cd "$OLDPWD" && realpath -e -- "$archivo") || { echo "No existe ${ARGS[1]}" >&2; exit 2; }
+        fi
+        "$NODE" bin/configure-fcm.js "$archivo" && reiniciar ;;
+    paypal)
+        "$NODE" bin/configure-paypal.js && reiniciar ;;
+    worker)
+        como_app bin/worker.js "${ARGS[@]:1}" ;;
+    ""|-h|--help|ayuda)
+        ayuda ;;
+    *)
+        echo "Orden desconocida: ${ARGS[0]}" >&2
+        ayuda >&2
+        exit 2 ;;
+esac

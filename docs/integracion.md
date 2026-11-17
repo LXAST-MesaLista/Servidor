@@ -184,7 +184,7 @@ El servidor envía al cliente a estas direcciones (plantillas `front.*` de
    `GET /reservations/{id}`. Los avisos nunca llevan el QR, las opciones ni la nota.
 
 El proyecto de Firebase de la app es el mismo cuya **cuenta de servicio** se
-configura en el servidor (`bin/configure-fcm.js`).
+configura en el servidor (`sudo mesalista push <cuenta-de-servicio.json>`).
 
 ### 6.3 Pago de la señal
 

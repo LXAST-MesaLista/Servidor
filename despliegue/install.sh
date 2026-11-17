@@ -246,6 +246,8 @@ install -m 644 "$REPO_DIR/package.json" "$APP_DIR/"
 install -m 644 "$REPO_DIR/config/config.example.json" "$APP_DIR/config/"
 install -m 700 "$REPO_DIR/despliegue/backup.sh" "$REPO_DIR/despliegue/restore.sh" "$LIB_DIR/"
 install -m 644 "$REPO_DIR/despliegue/permisos.sql" "$LIB_DIR/"
+# Comando de administración: «sudo mesalista estado», «sudo mesalista pin»…
+install -m 755 "$REPO_DIR/despliegue/mesalista" /usr/local/bin/mesalista
 
 # Dependencias (pg y argon2). Con package-lock.json, exactamente esas versiones.
 if [[ -f "$APP_DIR/package-lock.json" ]]; then
@@ -454,18 +456,18 @@ fi
 say "Listo"
 cat <<EOF
   API:               https://${DOMAIN}/api/v1/config
-  Servicio:          systemctl status mesalista-api   ·   journalctl -u mesalista-api
+  Comprobarlo todo:  sudo mesalista estado      (mensajes: sudo mesalista logs)
   Raíz de la web:    ${WEB_DIR}   (y sus directivas de Apache en /etc/apache2/mesalista-web.d/)
   Configuración:     ${CONFIG}
   Copias:            /var/backups/mesalista (diarias a las 03:30)
 
   Correo con Azure Communication Services (si no lo configuraste al instalar):
-    sudo node ${APP_DIR}/bin/configure-mail.js
+    sudo mesalista correo
   Avisos push con Firebase (cuenta de servicio del proyecto):
-    sudo node ${APP_DIR}/bin/configure-fcm.js <cuenta-de-servicio.json>
+    sudo mesalista push <cuenta-de-servicio.json>
   Señal de los grupos con PayPal sandbox (opcional):
-    sudo node ${APP_DIR}/bin/configure-paypal.js
-  Después de cambiar las claves: sudo systemctl restart mesalista-api
+    sudo mesalista paypal
+  (cada una reinicia la API al terminar; todas las órdenes: mesalista ayuda)
 
   El restaurante ya está configurado (bd/restaurante.sql): se puede reservar.
   Las mesas, el plano, los horarios y las cuentas del personal se cambian en

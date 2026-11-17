@@ -12,3 +12,4 @@
 # Binarios: nunca se tocan los saltos de línea
 *.pdf  binary
 *.png  binary
+despliegue/mesalista text eol=lf

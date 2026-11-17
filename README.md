@@ -57,6 +57,7 @@ bin/
   create-user.js   Crea cuentas del personal (la primera de administrador)
   set-close-pin.js Fija el PIN de «Cerrar local» (lo usa install.sh)
   configure-mail.js · configure-fcm.js · configure-paypal.js · write-config.js
+  (en el servidor se usan con el comando «mesalista»)
 bd/
   esquema.sql      Tablas, vista, restricción contra solapamientos y procedimientos
   datos.sql        Datos imprescindibles: parámetros del servicio y opciones de menú
@@ -66,6 +67,7 @@ config/
 data/common-passwords.txt
 despliegue/
   install.sh       Instalación completa en Azure (Ubuntu 24.04)
+  mesalista        Comando de administración (se instala en /usr/local/bin)
   apache-mesalista.conf, mesalista-api.service, permisos.sql, backup.sh, restore.sh
 docs/              openapi.yaml e integracion.md
 ```
@@ -110,10 +112,9 @@ docs/              openapi.yaml e integracion.md
 4. Opcional, cuando se tengan las claves:
 
    ```bash
-   sudo node /opt/mesalista-servidor/bin/configure-mail.js
-   sudo node /opt/mesalista-servidor/bin/configure-fcm.js <cuenta-de-servicio.json>
-   sudo node /opt/mesalista-servidor/bin/configure-paypal.js
-   sudo systemctl restart mesalista-api
+   sudo mesalista correo
+   sudo mesalista push <cuenta-de-servicio.json>
+   sudo mesalista paypal
    ```
 
 Queda así:
@@ -126,7 +127,26 @@ Queda así:
 | Base de datos | PostgreSQL 16 solo en local; dueño `mesalista_owner`, la API entra como `mesalista` (solo lee y escribe datos) |
 | Tareas | `worker.js` cada minuto, `worker.js --diario` a las 04:00 y copia a las 03:30 (`/etc/cron.d/mesalista`) |
 | Copias | `/var/backups/mesalista`, las de los últimos 14 días |
-| Registros | `journalctl -u mesalista-api` y `/var/log/mesalista` |
+| Registros | `sudo mesalista logs` (diario de systemd) y `/var/log/mesalista` |
+
+### Administración del servidor
+
+`install.sh` instala el comando `mesalista`. Funciona desde cualquier carpeta
+(se coloca en `/opt/mesalista-servidor` y usa el usuario que toca):
+
+| Orden | Para qué |
+|---|---|
+| `sudo mesalista estado` | Comprueba el servicio, argon2, la base de datos y que la API responde por HTTPS |
+| `sudo mesalista logs` | Últimos mensajes de la API |
+| `sudo mesalista reiniciar` | Reinicia la API (tras cambiar `config.json` a mano) |
+| `sudo mesalista usuario admin\|staff <correo> "<nombre>"` | Crea una cuenta del personal |
+| `sudo mesalista pin` | Cambia el PIN de «Cerrar local» |
+| `sudo mesalista correo` · `push <archivo.json>` · `paypal` | Configura Azure, Firebase o PayPal y reinicia la API |
+| `sudo mesalista worker [--diario]` | Lanza a mano las tareas de cron |
+
+La carpeta `/opt/mesalista-servidor` solo la pueden leer `root` y el usuario
+`mesalista` (contiene `config.json` con las claves): por eso no se puede entrar
+en ella con el usuario normal, y conviene usar siempre `sudo mesalista …`.
 
 **Actualizar:** `git pull` y volver a ejecutar `sudo bash despliegue/install.sh`
 (no borra datos y conserva `config.json`). Para empezar de cero:

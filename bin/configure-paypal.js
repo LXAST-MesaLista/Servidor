@@ -3,7 +3,7 @@
 // que PayPal las acepta. Las claves se escriben aquí, en el servidor; no se
 // muestran en pantalla ni se guardan en ningún otro sitio.
 //
-//   sudo node /opt/mesalista-servidor/bin/configure-paypal.js
+//   sudo mesalista paypal
 //   (vacío como Client ID = quitar las claves y desactivar la señal)
 
 import { settings } from '../src/config.js';
@@ -39,6 +39,6 @@ run(async () => {
   saveConfig({ ...settings, paypal: { mode: 'sandbox', client_id: clientId, secret } }, 'configure-paypal.js');
   console.log(clientId === ''
     ? 'Claves quitadas: los grupos aceptados se confirman sin señal.'
-    : 'Guardado. Reinicia la API (sudo systemctl restart mesalista-api) y los grupos aceptados pagarán la señal (Parámetros > señal por persona).');
+    : 'Guardado. Al reiniciar la API (sudo mesalista reiniciar), los grupos aceptados pagarán la señal (Parámetros > señal por persona).');
   return 0;
 });

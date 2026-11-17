@@ -3,8 +3,8 @@
 // de Firebase y comprueba con Google que funciona antes de guardarla. La clave
 // privada no se muestra en pantalla ni se guarda en ningún otro sitio.
 //
-//   sudo node /opt/mesalista-servidor/bin/configure-fcm.js <archivo.json>
-//   sudo node /opt/mesalista-servidor/bin/configure-fcm.js no      (desactivar)
+//   sudo mesalista push <archivo.json>
+//   sudo mesalista push no      (desactivar)
 //
 // El archivo JSON se descarga en la consola de Firebase: Configuración del
 // proyecto > Cuentas de servicio > Generar nueva clave privada. Después de
@@ -57,7 +57,7 @@ run(async () => {
 
   saveConfig({ ...settings, fcm }, 'configure-fcm.js');
   console.log(`Guardado: avisos push con el proyecto ${fcm.project_id}.\n`
-    + 'Reinicia la API para aplicarlo: sudo systemctl restart mesalista-api\n'
+    + 'Se aplica al reiniciar la API (sudo mesalista reiniciar).\n'
     + `Ya puedes borrar ${arg} del servidor.`);
   return 0;
 });

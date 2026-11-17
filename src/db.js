@@ -28,14 +28,11 @@ function getPool() {
       password: c.pass,
       max: c.pool ?? 10,
       idleTimeoutMillis: 30_000,
-    });
-    // Las fechas se guardan en hora de Madrid (timestamp sin zona). Con READ
-    // COMMITTED, las comprobaciones de solapamiento que siguen a un bloqueo de
-    // mesas ven siempre las reservas ya confirmadas (RF-09).
-    pool.on('connect', (client) => {
-      client.query("SET TIME ZONE 'Europe/Madrid'; "
-        + 'SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL READ COMMITTED')
-        .catch((e) => console.error(`MesaLista: no se ha podido preparar la conexión (${e.code ?? e.name})`));
+      // Se fijan al abrir cada conexión. Las fechas se guardan en hora de Madrid
+      // (timestamp sin zona). Con READ COMMITTED, las comprobaciones de
+      // solapamiento que siguen a un bloqueo de mesas ven siempre las reservas
+      // ya confirmadas (RF-09).
+      options: '-c TimeZone=Europe/Madrid -c default_transaction_isolation=read\\ committed',
     });
     pool.on('error', (e) => {
       console.error(`MesaLista: conexión con PostgreSQL perdida (${e.code ?? e.name})`);

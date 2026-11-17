@@ -1512,7 +1512,8 @@ test('CP-26', 'Exportar a CSV', async () => {
   const staff = await staffClient(book);
 
   const res = await staff.raw('GET', `/panel/reservations.csv?date=${day()}`);
-  const csv = await res.text();
+  // Bytes tal cual: res.text() quitaría el BOM al decodificar.
+  const csv = Buffer.from(await res.arrayBuffer()).toString('utf8');
   const type = res.headers.get('content-type') ?? '';
   check(res.status === 200 && type.startsWith('text/csv'), 'el personal descarga el CSV', type);
   check(csv.startsWith('﻿"Fecha";"Hora"'), 'empieza con BOM y la cabecera separada por «;»', csv.slice(0, 40));

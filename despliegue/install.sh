@@ -253,6 +253,19 @@ if [[ -f "$APP_DIR/package-lock.json" ]]; then
 else
     (cd "$APP_DIR" && npm install --omit=dev --no-audit --no-fund)
 fi
+# argon2 trae su binario precompilado para Linux x64, así que no necesita su
+# script de instalación (las versiones nuevas de npm no lo ejecutan sin
+# aprobarlo: es el aviso «install scripts not yet covered by allowScripts»).
+# Se comprueba que carga y, si no, se compila aquí.
+argon2_ok() { (cd "$APP_DIR" && node -e "require('argon2').hash('x').then(() => process.exit(0), () => process.exit(1))") >/dev/null 2>&1; }
+if argon2_ok; then
+    echo "argon2: binario precompilado cargado."
+else
+    warn "argon2 no carga con el binario precompilado; se compila (tarda un poco)."
+    apt-get install -y -q build-essential python3
+    (cd "$APP_DIR" && npm rebuild argon2 --foreground-scripts)
+    argon2_ok || { warn "argon2 sigue sin cargar: revisa la salida de npm."; exit 1; }
+fi
 
 # Crea config.json la primera vez; si ya existe, solo cambia el dominio (si se ha cambiado).
 ML_CONFIG="$CONFIG" ML_DB_PASS="$DB_PASS" ML_DOMAIN="$DOMAIN" \

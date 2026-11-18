@@ -7,7 +7,7 @@ con Ubuntu Server 24.04. Es una de las tres partes del proyecto:
 | Parte | Cómo se conecta |
 |---|---|
 | **Servidor** (este repositorio) | Ofrece la API en `https://<dominio>/api/v1/` |
-| Web ([MesaLista-web](https://github.com/LXPT-UIB/MesaLista-web)) | Su servidor llama a la API con un token Bearer |
+| Web ([LXPT-UIB/WEB](https://github.com/LXPT-UIB/WEB)) | Su servidor llama a la API con un token Bearer |
 | App ([MesaLista-Firebase](https://github.com/LXPT-UIB/MesaLista-Firebase)) | Android (Kotlin y Jetpack Compose): llama a la API con un token Bearer y recibe avisos push por FCM |
 
 Todas las reglas del servicio (disponibilidad, plazos, mesas, QR, pagos…) están
@@ -22,7 +22,7 @@ las rutas.
 ```
 Internet ──HTTPS──▶ nginx (TLS, cabeceras de seguridad)
                        ├── /api/v1/*  ──HTTP──▶ Node.js (mesalista-api, 127.0.0.1:8091) ──▶ PostgreSQL 16
-                       └── /          ──────▶ web (/var/www/mesalista-web)
+                       └── /          ──HTTP──▶ web (mesalista-web, 127.0.0.1:8092; proyecto aparte)
 cron ──▶ bin/worker.js (cada minuto y a diario)
 ```
 
@@ -123,7 +123,7 @@ Queda así:
 |---|---|
 | API | `https://<dominio>/api/v1/` → nginx → `mesalista-api.service` (Node.js en `127.0.0.1:8091`) |
 | Código y `config.json` | `/opt/mesalista-servidor` (dueño `root`, grupo `mesalista`) |
-| Raíz de la web (la instala [MesaLista-web](https://github.com/LXPT-UIB/MesaLista-web)) | `/var/www/mesalista-web`, con sus directivas de Apache en `/etc/apache2/mesalista-web.d/` |
+| Sitio de nginx | `/etc/nginx/sites-available/mesalista`. Sin la web, solo la API (`despliegue/nginx-mesalista.conf`). Con la web ([LXPT-UIB/WEB](https://github.com/LXPT-UIB/WEB), en `/opt/mesalista-web`), los dos instaladores generan el mismo sitio con la plantilla de la web, así que ninguno pisa al otro. Si quedaba Apache de una instalación anterior, se desactiva |
 | Base de datos | PostgreSQL 16 solo en local; dueño `mesalista_owner`, la API entra como `mesalista` (solo lee y escribe datos) |
 | Tareas | `worker.js` cada minuto, `worker.js --diario` a las 04:00 y copia a las 03:30 (`/etc/cron.d/mesalista`) |
 | Copias | `/var/backups/mesalista`, las de los últimos 14 días |

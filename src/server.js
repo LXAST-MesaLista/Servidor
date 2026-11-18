@@ -3,8 +3,8 @@
 //   node src/server.js
 //
 // Escucha en listen.host:listen.port de config.json (por defecto
-// 127.0.0.1:8091). En el servidor real solo lo alcanza Apache, que termina
-// HTTPS y le reenvía /api/v1/ (despliegue/apache-mesalista.conf).
+// 127.0.0.1:8091). En el servidor real solo lo alcanza nginx, que termina
+// HTTPS y le reenvía /api/v1/ (despliegue/nginx-mesalista.conf).
 
 import { config } from './config.js';
 import { createServer } from 'node:http';

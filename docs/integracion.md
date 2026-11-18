@@ -137,16 +137,25 @@ El servidor envía al cliente a estas direcciones (plantillas `front.*` de
 | `front.payment_web` | `https://<dominio>/reservas/{id}?pago={result}` | Vuelta de PayPal al pagar desde la web; `result`: `ok`, `error`, `caducado` o `cancelado` |
 | `front.payment_unknown` | `https://<dominio>/reservas?pago=error` | Vuelta de PayPal sin un pedido conocido |
 
-### 5.4 Apache
+### 5.4 nginx
 
-- La web se instala en `/var/www/mesalista-web` (raíz del dominio). Sus directivas
-  propias (caché, reescrituras, cabeceras) van en
-  `/etc/apache2/mesalista-web.d/*.conf`, sin tocar el sitio del servidor.
+- nginx atiende el dominio (puertos 80 y 443) con un único sitio,
+  `/etc/nginx/sites-available/mesalista`: `/api/v1` va a la API
+  (`127.0.0.1:8091`) y el resto, a la web (`mesalista-web.service`,
+  `127.0.0.1:8092`, instalada en `/opt/mesalista-web`).
+- La plantilla del sitio completo es la de la web
+  (`despliegue/nginx-mesalista.conf` de LXPT-UIB/WEB). Si la web está instalada,
+  `install.sh` del servidor también la usa; si no, usa la suya, que solo tiene la
+  API. Los cambios del sitio (caché, cabeceras, rutas de la web) se hacen en la
+  plantilla de la web, que debe mantener los marcadores `__DOMAIN__`,
+  `__APP_DIR__`, `__ACME_DIR__`, `__WEB_PORT__`, `__API_PORT__`, `__CERT__` y
+  `__KEY__`, y el bloque de `/api/v1` con `X-Forwarded-For $remote_addr` y
+  `X-Forwarded-Proto https`.
 - Se recomienda servir las librerías desde la propia web (no cargarlas de un CDN)
-  y poner una CSP estricta, por ejemplo
-  `Header always set Content-Security-Policy "default-src 'self'; frame-ancestors 'none'"`.
+  y que las páginas envíen una CSP estricta, por ejemplo
+  `default-src 'self'; frame-ancestors 'none'`.
 - No registrar la cadena de consulta en los registros de acceso (el token del
-  enlace de contraseña va en ella): el sitio de Apache ya usa un formato sin ella.
+  enlace de contraseña va en ella): el formato `mesalista` del sitio ya la omite.
 
 ## 6. La app (con Firebase)
 
@@ -212,8 +221,8 @@ que llamar a `POST /auth/forgot`.
 **Web**
 - Llama desde su servidor, guarda el token en su sesión y envía `X-Forwarded-For`.
 - Tiene sus propias cookies con protección CSRF.
-- Crea las páginas de `front.reset` y `front.payment_web`, y pone su CSP en
-  `mesalista-web.d`.
+- Crea las páginas de `front.reset` y `front.payment_web`, envía su propia CSP y
+  mantiene la plantilla del sitio de nginx (apartado 5.4).
 
 **App**
 - Llama directamente por HTTPS y guarda el token cifrado.

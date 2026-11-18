@@ -113,7 +113,7 @@ export function remoteAddress() {
 const trusted = (ip) => (config('trusted_proxies', []) ?? []).includes(ip);
 
 /**
- * IP del cliente. La web llama a la API desde su propio servidor y Apache
+ * IP del cliente. La web llama a la API desde su propio servidor y nginx
  * reenvía las peticiones a Node.js: si la conexión llega de una dirección de
  * confianza (trusted_proxies), la IP real es la última de X-Forwarded-For que
  * no sea de confianza. Así el bloqueo por intentos fallidos (RS-06) sigue
@@ -137,7 +137,7 @@ export function ip() {
   return remote;
 }
 
-/** ¿Ha llegado por HTTPS? Directamente, o por Apache (X-Forwarded-Proto) desde trusted_proxies. */
+/** ¿Ha llegado por HTTPS? Directamente, o por nginx (X-Forwarded-Proto) desde trusted_proxies. */
 export function isHttps() {
   const req = state().req;
   if (req?.encrypted) {

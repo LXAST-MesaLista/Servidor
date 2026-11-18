@@ -136,7 +136,7 @@ Queda así:
 
 | Orden | Para qué |
 |---|---|
-| `sudo mesalista estado` | Comprueba el servicio, argon2, la base de datos y que la API responde por HTTPS |
+| `sudo mesalista estado` | Comprueba todo: servicios (API, web, nginx, PostgreSQL, cron), HTTPS y caducidad del certificado, que Azure, Firebase y PayPal aceptan sus claves (sin enviar ni cobrar nada), las colas de correos y avisos, la última copia, el disco y el cortafuegos. ✔ funciona · ✘ falla · ! hay que mirarlo · – opcional sin configurar |
 | `sudo mesalista logs` | Últimos mensajes de la API |
 | `sudo mesalista reiniciar` | Reinicia la API (tras cambiar `config.json` a mano) |
 | `sudo mesalista usuario admin\|staff <correo> "<nombre>"` | Crea una cuenta del personal |

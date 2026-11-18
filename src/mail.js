@@ -10,7 +10,7 @@
 // con la clave del recurso (no hace falta ninguna aplicación de Microsoft
 // Entra). Sin cadena de conexión en config.json, se quedan en la cola.
 
-import { createHash, createHmac, randomBytes } from 'node:crypto';
+import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 import * as db from './db.js';
 import * as clock from './clock.js';
 import * as push from './push.js';
@@ -164,6 +164,36 @@ export async function send(to, subject, body) {
     throw new MailThrottled(error);
   }
   throw new Error(error);
+}
+
+/**
+ * Comprueba la cadena de conexión sin enviar ningún correo (lo usa
+ * «mesalista estado»): pide el estado de una operación de envío que no
+ * existe, firmada igual que un envío. Si Azure acepta la firma, responde que
+ * no la encuentra (404); si la clave no vale, 401. Devuelve el código HTTP.
+ */
+export async function checkCredentials() {
+  const [endpoint, key] = connection(String(config('mail.connection_string', '')));
+  const path = `/emails/operations/${randomUUID()}?api-version=2023-03-31`;
+  const host = new URL(endpoint).host;
+  const date = new Date().toUTCString();
+  const contentHash = createHash('sha256').update('', 'utf8').digest('base64');
+  const signature = createHmac('sha256', key)
+    .update(`GET\n${path}\n${date};${host};${contentHash}`, 'utf8')
+    .digest('base64');
+  try {
+    const res = await fetch(endpoint + path, {
+      headers: {
+        'x-ms-date': date,
+        'x-ms-content-sha256': contentHash,
+        Authorization: `HMAC-SHA256 SignedHeaders=x-ms-date;host;x-ms-content-sha256&Signature=${signature}`,
+      },
+      signal: AbortSignal.timeout(10_000),
+    });
+    return res.status;
+  } catch (e) {
+    throw new Error(`Azure: ${e.cause?.code ?? e.name}`);
+  }
 }
 
 /**

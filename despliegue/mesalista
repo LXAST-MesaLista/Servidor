@@ -4,7 +4,7 @@
 # carpeta: se coloca en /opt/mesalista-servidor y ejecuta cada script con el
 # usuario adecuado (mesalista para los datos, root para tocar config.json).
 #
-#   sudo mesalista estado                         servicio, argon2, base de datos y API
+#   sudo mesalista estado                         servicios, HTTPS, copias, correo, push y PayPal
 #   sudo mesalista logs                           últimos mensajes de la API
 #   sudo mesalista reiniciar                      reinicia la API (tras cambiar config.json)
 #   sudo mesalista usuario admin|staff <correo> "<nombre>"
@@ -35,34 +35,101 @@ NODE=$(command -v node)
 como_app() { sudo -u "$APP_USER" "$NODE" "$@"; }
 reiniciar() { systemctl restart mesalista-api && echo "API reiniciada."; }
 
+# ---------------------------------------------------------------------------
+# sudo mesalista estado: ✔ funciona · ✘ falla · ! hay que mirarlo · – opcional,
+# sin configurar. Sale con 1 si hay algún ✘.
+# ---------------------------------------------------------------------------
+FALLOS=0
+bien()  { echo "✔ $*"; }
+mal()   { echo "✘ $*"; FALLOS=$((FALLOS + 1)); }
+aviso() { echo "! $*"; }
+nada()  { echo "– $*"; }
+titulo() { printf '\n\033[1m%s\033[0m\n' "$*"; }
+servicio() {  # servicio UNIDAD "nombre"
+    if systemctl is-active --quiet "$1"; then bien "$2 en marcha"; else mal "$2 parado (systemctl status $1)"; fi
+}
+
+estado() {
+    local domain code dias fin ultima edad uso reinicios mesas
+    domain=$("$NODE" -e "process.stdout.write(String(JSON.parse(require('fs').readFileSync('$CONFIG','utf8')).domain ?? ''))" 2>/dev/null || true)
+
+    titulo "Servicios"
+    servicio mesalista-api "API (mesalista-api)"
+    reinicios=$(systemctl show -p NRestarts --value mesalista-api 2>/dev/null || echo 0)
+    [[ "$reinicios" =~ ^[0-9]+$ && "$reinicios" -gt 0 ]] \
+        && aviso "  la API se ha reiniciado sola ${reinicios} veces desde que arrancó (sudo mesalista logs)"
+    if [[ -f /etc/systemd/system/mesalista-web.service ]]; then
+        servicio mesalista-web "web (mesalista-web)"
+    else
+        nada "web sin instalar en esta máquina (LXPT-UIB/WEB)"
+    fi
+    servicio nginx "nginx (HTTPS)"
+    if pg_isready -q 2>/dev/null; then bien "PostgreSQL acepta conexiones"; else mal "PostgreSQL no responde (pg_lsclusters)"; fi
+    servicio cron "cron (worker cada minuto y copia diaria)"
+    [[ -f /etc/cron.d/mesalista ]] || mal "falta /etc/cron.d/mesalista (vuelve a ejecutar install.sh)"
+    if systemctl is-active --quiet apache2 2>/dev/null; then
+        mal "Apache está en marcha y le quita los puertos 80 y 443 a nginx (sudo systemctl disable --now apache2)"
+    fi
+
+    titulo "API y base de datos"
+    if como_app -e "require('$APP_DIR/node_modules/argon2').hash('x').then(() => process.exit(0), () => process.exit(1))" 2>/dev/null; then
+        bien "argon2 carga"
+    else
+        mal "argon2 no carga (vuelve a ejecutar install.sh)"
+    fi
+    # postgres no puede entrar en esta carpeta: psql se lanza desde «/».
+    mesas=$(cd / && sudo -u postgres psql -X -tA -d mesalista -c "SELECT COUNT(*) FROM dining_tables WHERE active AND deleted_at IS NULL" 2>/dev/null || true)
+    if [[ "$mesas" =~ ^[0-9]+$ ]]; then bien "base de datos: ${mesas} mesas activas"; else mal "no se puede consultar la base de datos"; fi
+
+    titulo "HTTPS en ${domain:-?}"
+    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 --resolve "$domain:443:127.0.0.1" "https://$domain/api/v1/config" || true)
+    if [[ "$code" == "200" ]]; then bien "API: https://$domain/api/v1/config responde"; else mal "API: https://$domain/api/v1/config responde ${code:-sin respuesta}"; fi
+    if [[ -f /etc/systemd/system/mesalista-web.service ]]; then
+        code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 --resolve "$domain:443:127.0.0.1" "https://$domain/" || true)
+        if [[ "$code" == "200" ]]; then bien "web: https://$domain/ responde"; else mal "web: https://$domain/ responde ${code:-sin respuesta} (journalctl -u mesalista-web)"; fi
+    fi
+    if [[ -f "/etc/letsencrypt/live/$domain/fullchain.pem" ]]; then
+        fin=$(openssl x509 -enddate -noout -in "/etc/letsencrypt/live/$domain/fullchain.pem" | cut -d= -f2)
+        dias=$(( ($(date -d "$fin" +%s) - $(date +%s)) / 86400 ))
+        if (( dias < 0 )); then
+            mal "certificado de Let's Encrypt caducado (sudo certbot renew)"
+        elif (( dias < 20 )); then
+            mal "certificado de Let's Encrypt: caduca en ${dias} días y no se ha renovado (sudo certbot renew --dry-run)"
+        else
+            bien "certificado de Let's Encrypt: caduca en ${dias} días (se renueva solo)"
+        fi
+        systemctl is-active --quiet certbot.timer || aviso "  certbot.timer no está activo: el certificado no se renovará solo"
+    else
+        mal "sin certificado de Let's Encrypt: se usa uno autofirmado (vuelve a ejecutar install.sh)"
+    fi
+
+    titulo "Correo, avisos push y PayPal"
+    como_app bin/status.js || FALLOS=$((FALLOS + 1))
+
+    titulo "Máquina"
+    ultima=$(find /var/backups/mesalista -maxdepth 1 -name '*.tar.gz' -printf '%T@ %f\n' 2>/dev/null | sort -n | tail -1 || true)
+    if [[ -z "$ultima" ]]; then
+        mal "no hay ninguna copia en /var/backups/mesalista (sudo bash /usr/local/lib/mesalista/backup.sh)"
+    else
+        edad=$(( ($(date +%s) - ${ultima%%.*}) / 3600 ))
+        if (( edad > 26 )); then
+            mal "última copia hace ${edad} h: ${ultima#* } (mira /var/log/mesalista/backup.log)"
+        else
+            bien "última copia hace ${edad} h: ${ultima#* }"
+        fi
+    fi
+    uso=$(df -P / | awk 'NR == 2 { sub("%", "", $5); print $5 }')
+    if (( uso >= 90 )); then mal "disco al ${uso}% (sudo du -xh / --max-depth=2 | sort -h | tail)"; else bien "disco al ${uso}%"; fi
+    if ufw status 2>/dev/null | grep -q '^Status: active'; then bien "cortafuegos (ufw) activo"; else mal "cortafuegos (ufw) desactivado (vuelve a ejecutar install.sh)"; fi
+
+    echo
+    if (( FALLOS == 0 )); then echo "Todo en orden."; else echo "Hay cosas que revisar: las marcadas con ✘."; fi
+    (( FALLOS == 0 ))
+}
+
 case "${ARGS[0]:-}" in
     estado)
-        ok=1
-        if systemctl is-active --quiet mesalista-api; then
-            echo "✔ servicio mesalista-api en marcha"
-        else
-            echo "✘ servicio mesalista-api parado (sudo mesalista logs)"; ok=0
-        fi
-        if como_app -e "require('$APP_DIR/node_modules/argon2').hash('x').then(() => process.exit(0), () => process.exit(1))" 2>/dev/null; then
-            echo "✔ argon2 carga"
-        else
-            echo "✘ argon2 no carga (vuelve a ejecutar install.sh)"; ok=0
-        fi
-        # postgres no puede entrar en esta carpeta: psql se lanza desde «/».
-        MESAS=$(cd / && sudo -u postgres psql -X -tA -d mesalista -c "SELECT COUNT(*) FROM dining_tables WHERE active AND deleted_at IS NULL" 2>/dev/null || true)
-        if [[ "$MESAS" =~ ^[0-9]+$ ]]; then
-            echo "✔ base de datos: ${MESAS} mesas activas"
-        else
-            echo "✘ no se puede consultar la base de datos"; ok=0
-        fi
-        DOMAIN=$("$NODE" -e "process.stdout.write(JSON.parse(require('fs').readFileSync('$CONFIG','utf8')).domain ?? '')")
-        CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/api/v1/config" || true)
-        if [[ "$CODE" == "200" ]]; then
-            echo "✔ API: https://$DOMAIN/api/v1/config responde"
-        else
-            echo "✘ API: https://$DOMAIN/api/v1/config responde ${CODE:-sin respuesta}"; ok=0
-        fi
-        (( ok )) ;;
+        estado ;;
     logs)
         journalctl -u mesalista-api -n 50 --no-pager ;;
     reiniciar)

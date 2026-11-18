@@ -494,7 +494,12 @@ paths:
     get:
       tags: [Grupos y señal]
       summary: Solicitudes de grupo del cliente
-      description: Las pendientes y las respondidas por el restaurante en los últimos 30 días (aceptadas, rechazadas o caducadas). Las que cancela el propio cliente no aparecen, tampoco si cancela la reserva de un grupo ya aceptado.
+      description: >-
+        Las pendientes y las demás de los últimos 30 días. Las aceptadas llevan `reservation_id`; con el estado de
+        esa reserva (en `GET /reservations`) la web y la app las reparten: `pending` y las aceptadas con la reserva
+        en `pending_payment`, en «Solicitudes de grupo»; `expired`, `rejected` y las `cancelled` sin reserva, en
+        «Anteriores». Si el cliente cancela la reserva de un grupo aceptado, la solicitud pasa a `cancelled` con su
+        `reservation_id`, y basta con mostrar la reserva cancelada.
       security: [{cliente: []}]
       responses:
         '200': {$ref: '#/components/responses/GroupRequests'}

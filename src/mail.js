@@ -1,10 +1,11 @@
-// Correos de reservas (RF-17, RP-05).
+// Correo (RP-05): solo para restablecer la contraseña (auth.js). Los cambios
+// de las reservas y de las solicitudes de grupo se avisan por push (Firebase,
+// push.js) y en los avisos de la app y de la web (tabla notifications).
 //
 // Los correos se guardan en email_outbox dentro de la misma transacción que
-// el cambio de la reserva y se envían después de responder al cliente (o
-// desde bin/worker.js cada minuto), para que el proveedor no retrase la
-// respuesta de la API. El texto solo lleva nombre, fecha, hora y comensales:
-// nunca el QR, las opciones de menú ni la nota.
+// el cambio y se envían después de responder al cliente (o desde
+// bin/worker.js cada minuto), para que el proveedor no retrase la respuesta
+// de la API.
 //
 // Se envían con Azure Communication Services Email, por su API REST firmada
 // con la clave del recurso (no hace falta ninguna aplicación de Microsoft
@@ -37,30 +38,24 @@ export function when(start) {
 /** «1 comensal», «4 comensales». */
 export const people = (n) => (n === 1 ? '1 comensal' : `${n} comensales`);
 
+/** Título del aviso push de cada cambio de reserva. */
 const EVENTS = {
-  confirmed: ['Reserva confirmada', 'Tu reserva está confirmada.'],
-  modified: ['Reserva modificada', 'Hemos aplicado el cambio en tu reserva. El QR anterior ya no es válido: usa el que aparece ahora en la app.'],
-  cancelled_holder: ['Reserva cancelada', 'Tu reserva se ha cancelado.'],
-  cancelled_restaurant: ['Reserva cancelada por el restaurante', 'Lo sentimos: el restaurante ha tenido que cancelar tu reserva. Si quieres, puedes reservar otra hora desde la app.'],
-  group_accepted: ['Solicitud de grupo aceptada', 'El restaurante ha aceptado tu solicitud de grupo. Para confirmarla, paga la señal desde la app MesaLista.'],
-  payment_expired: ['Reserva sin confirmar', 'Se ha terminado el plazo para pagar la señal y la reserva se ha liberado. Si aún quieres venir, envía otra solicitud desde la app.'],
+  confirmed: 'Reserva confirmada',
+  modified: 'Reserva modificada',
+  cancelled_holder: 'Reserva cancelada',
+  cancelled_restaurant: 'Reserva cancelada por el restaurante',
+  group_accepted: 'Solicitud de grupo aceptada',
+  payment_expired: 'Reserva sin confirmar',
 };
 
 /**
- * Correo (y aviso push) de un cambio de reserva. reservation lleva al menos
- * start_at ("AAAA-MM-DD HH:MM:SS") y party_size; id si existe. extra se añade
- * al final del primer párrafo (p. ej. el aviso de la devolución de la señal).
+ * Aviso de un cambio de reserva: solo por push (Firebase), ya no por correo.
+ * reservation lleva al menos start_at ("AAAA-MM-DD HH:MM:SS") y party_size;
+ * id si existe. name y extra eran para el texto del correo: se siguen
+ * aceptando para no cambiar las llamadas, pero ya no se usan.
  */
 export async function queueReservation(event, to, name, reservation, extra = '') {
-  const [subject, introBase] = EVENTS[event];
-  const intro = extra !== '' ? `${introBase} ${extra}` : introBase;
-  const body = `Hola, ${name}:\n\n${intro}\n\n`
-    + `Fecha y hora: ${when(clock.at(reservation.start_at))}\n`
-    + `Comensales: ${people(Number(reservation.party_size))}\n\n`
-    + 'Puedes consultar tus reservas en la app MesaLista.\n';
-  await queue(to, subject, body);
-  // El mismo cambio llega también como aviso push a la app del cliente.
-  await push.queueReservation(event, to, reservation, subject);
+  await push.queueReservation(event, to, reservation, EVENTS[event]);
 }
 
 /** Correo cualquiera a la cola (el asunto lleva delante «MesaLista · »). */

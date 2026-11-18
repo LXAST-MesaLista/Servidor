@@ -36,8 +36,10 @@ cron ──▶ bin/worker.js (cada minuto y a diario)
 - RF-09: las mesas candidatas se bloquean con `SELECT … FOR UPDATE` antes de
   asignar una, y una restricción de exclusión de PostgreSQL rechaza además
   cualquier solapamiento que se escapara.
-- Correos (Azure Communication Services), avisos push (FCM) y devoluciones de
-  PayPal se apuntan en la misma transacción que el cambio y se envían después de
+- Los cambios de las reservas y de las solicitudes de grupo se avisan por push
+  (FCM) y en los avisos de la app y de la web. El correo (Azure Communication
+  Services) solo se usa para restablecer la contraseña.
+- Correos, avisos push y devoluciones de PayPal se apuntan en la misma transacción que el cambio y se envían después de
   responder; lo que falle lo reintenta `bin/worker.js`.
 
 ## Estructura
@@ -83,7 +85,7 @@ docs/              openapi.yaml e integracion.md
 | `require_https` | RS-01: la API rechaza lo que no llega por HTTPS (nginx lo indica con `X-Forwarded-Proto`) |
 | `trusted_proxies` | Desde dónde se aceptan `X-Forwarded-For` y `X-Forwarded-Proto` (nginx y la web, en la misma máquina) |
 | `front` | Páginas de la web y de la app a las que el servidor envía al cliente: `reset` (RF-40), `payment_web`, `payment_app` y `payment_unknown` (RF-44). `{token}`, `{id}` y `{result}` se sustituyen |
-| `mail` | Azure Communication Services Email (`bin/configure-mail.js`). Sin cadena de conexión, los correos esperan en `email_outbox` |
+| `mail` | Azure Communication Services Email (`bin/configure-mail.js`): solo el correo para restablecer la contraseña. Sin cadena de conexión, espera en `email_outbox` |
 | `fcm` | Cuenta de servicio de Firebase para los avisos push (`bin/configure-fcm.js`) |
 | `paypal` | Claves de PayPal **sandbox** (`bin/configure-paypal.js`). Sin claves, los grupos aceptados se confirman sin señal |
 
@@ -201,8 +203,8 @@ Administración, o con la API (`/api/v1/admin/*`, ver `docs/openapi.yaml`).
 - Al pagar la señal se indica `{"from": "web"}` o `{"from": "app"}`; al terminar,
   PayPal devuelve al cliente a la plantilla `front.payment_web` o `front.payment_app`.
 - Avisos push: la app registra su dispositivo en `POST /api/v1/me/devices`; cada
-  cambio que envía un correo de reserva envía también un aviso con `data.type` y
-  `data.reservation_id`. Necesita la cuenta de servicio de Firebase
+  cambio de una reserva o de una solicitud de grupo envía un aviso con `data.type`
+  y `data.reservation_id` (los cambios ya no se avisan por correo). Necesita la cuenta de servicio de Firebase
   (`bin/configure-fcm.js`).
 
 Todo el detalle, en [`docs/integracion.md`](docs/integracion.md) y

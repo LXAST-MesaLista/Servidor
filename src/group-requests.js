@@ -73,14 +73,13 @@ export async function create(user, input) {
 }
 
 /**
- * Solicitudes del cliente aún vigentes: las pendientes y las que el
- * restaurante ha decidido en los últimos 30 días. Las que el propio cliente
- * ha cancelado desaparecen de la lista en cuanto las cancela.
+ * Solicitudes del cliente: las pendientes y las demás de los últimos 30 días.
+ * La web y la app las reparten: las pendientes y las aceptadas sin pagar, en
+ * «Solicitudes de grupo»; las caducadas, rechazadas y canceladas, en «Anteriores».
  */
 export async function forClient(userId) {
   const rows = await db.all(
     `SELECT * FROM group_requests WHERE user_id = ?
-        AND status <> 'cancelled'
         AND (status = 'pending' OR created_at > ?)
       ORDER BY status = 'pending' DESC, day, time_min`,
     [userId, clock.sql(clock.addDays(clock.now(), -30))],
@@ -122,11 +121,8 @@ export async function reject(staffId, id, input) {
       V.cut(`El restaurante no puede atender tu grupo del ${clock.dmy(start)} a las ${clock.hm(start)}: ${reply}`, 255),
       clock.sql(),
     ]);
+    // Aviso por push (y en la app), no por correo: el correo es solo para la contraseña.
     const u = await db.one('SELECT name, email FROM users WHERE id = ?', [g.user_id]);
-    await mail.queue(u.email, 'Solicitud de grupo no aceptada',
-      `Hola, ${u.name}:\n\nLo sentimos: el restaurante no puede atender tu solicitud de grupo de `
-      + `${g.party_size} comensales para el ${mail.when(start)}.\n\n`
-      + `Motivo: ${reply}\n\nPuedes enviar otra solicitud para otra fecha desde la app MesaLista.\n`);
     await push.queueForEmail(u.email, 'Solicitud de grupo no aceptada',
       `${g.party_size} comensales · ${push.capitalize(mail.when(start))}`, { type: 'group_rejected' });
   });

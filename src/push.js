@@ -1,8 +1,8 @@
 // Avisos push en la app con Firebase Cloud Messaging (API HTTP v1).
 //
-// Cada cambio que envía un correo de reserva (mail.queueReservation) o el de
-// grupo no aceptado envía también un aviso push a cada dispositivo que el
-// cliente ha registrado con POST /me/devices. Como los correos, los avisos se
+// Cada cambio de una reserva (mail.queueReservation) y el de grupo no
+// aceptado envían un aviso push a cada dispositivo que el cliente ha
+// registrado con POST /me/devices; ya no se avisan por correo. Los avisos se
 // guardan en push_outbox dentro de la transacción del cambio y se envían
 // después de responder (o desde bin/worker.js cada minuto). Solo llevan el
 // asunto, la fecha, la hora y los comensales: nunca el QR, las opciones de

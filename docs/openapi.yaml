@@ -494,7 +494,7 @@ paths:
     get:
       tags: [Grupos y señal]
       summary: Solicitudes de grupo del cliente
-      description: Las pendientes y las respondidas por el restaurante en los últimos 30 días (aceptadas, rechazadas o caducadas). Las que retira el propio cliente no aparecen.
+      description: Las pendientes y las respondidas por el restaurante en los últimos 30 días (aceptadas, rechazadas o caducadas). Las que cancela el propio cliente no aparecen, tampoco si cancela la reserva de un grupo ya aceptado.
       security: [{cliente: []}]
       responses:
         '200': {$ref: '#/components/responses/GroupRequests'}
@@ -1008,7 +1008,7 @@ paths:
     get:
       tags: [Grupos y señal]
       summary: Solicitudes de grupo para el personal
-      description: Las pendientes y las respondidas en los últimos 30 días. Las que ha retirado el cliente no aparecen.
+      description: Las pendientes y las demás de los últimos 30 días, también las canceladas por el cliente (`cancelled`), antes o después de aceptarlas.
       security: [{panel: []}]
       responses:
         '200': {$ref: '#/components/responses/GroupRequests'}

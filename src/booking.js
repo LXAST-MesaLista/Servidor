@@ -122,6 +122,25 @@ async function pickTable(party, start, end, excludeId, freeNow = false) {
 export async function markNoShows() {
   await db.run('CALL sp_mark_no_shows(?::timestamp)', [clock.sql()]);
   await notifyExpiredPayments();
+  await syncGroupCancellations();
+}
+
+/**
+ * RF-43: si el cliente cancela la reserva de un grupo ya aceptado (pagada o
+ * pendiente de pago), la solicitud pasa a «cancelada»: el panel la muestra
+ * como «Cancelada por el cliente» y deja de salir en «Mis reservas». Se
+ * llama al cancelar y también cada minuto (worker.js), lo que corrige las
+ * que se cancelaron antes de existir esta comprobación.
+ */
+async function syncGroupCancellations(reservationId = null) {
+  await db.exec(
+    `UPDATE group_requests g SET status = 'cancelled'
+       FROM reservations r
+      WHERE r.id = g.reservation_id AND g.status = 'accepted'
+        AND r.status = 'cancelled' AND r.cancelled_by = 'holder'
+        ${reservationId === null ? '' : 'AND r.id = ?'}`,
+    reservationId === null ? [] : [reservationId],
+  );
 }
 
 /**
@@ -547,6 +566,7 @@ export async function cancelByHolder(user, id) {
       "UPDATE reservations SET status = 'cancelled', cancelled_by = 'holder', cancelled_at = ?, payment_due_at = NULL WHERE id = ?",
       [clock.sql(), id],
     );
+    await syncGroupCancellations(id);
     const refund = await payments.markRefund(id);
     await mail.queueReservation('cancelled_holder', user.email, user.name, r,
       refund > 0 ? `Te devolvemos la señal de ${payments.euros(refund)} en tu cuenta de PayPal.` : '');

@@ -133,15 +133,15 @@ export async function reject(staffId, id, input) {
 }
 
 /**
- * Para el panel: pendientes primero y las respondidas de los últimos 30 días.
- * Las que ha retirado el cliente no se muestran: nadie tiene que responderlas.
+ * Para el panel: pendientes primero y las demás de los últimos 30 días,
+ * también las que ha cancelado el cliente (antes o después de aceptarlas),
+ * para que el personal sepa que ya no vienen.
  */
 export async function forStaff() {
   const rows = await db.all(
     `SELECT g.*, u.name AS user_name, u.phone AS user_phone, u.email AS user_email
        FROM group_requests g LEFT JOIN users u ON u.id = g.user_id
-      WHERE g.status <> 'cancelled'
-        AND (g.status = 'pending' OR g.created_at > ?)
+      WHERE g.status = 'pending' OR g.created_at > ?
       ORDER BY g.status = 'pending' DESC, g.day, g.time_min`,
     [clock.sql(clock.addDays(clock.now(), -30))],
   );

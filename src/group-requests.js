@@ -72,10 +72,15 @@ export async function create(user, input) {
   return forClient(user.id);
 }
 
-/** Solicitudes del cliente aún vigentes (pendientes, y las decididas de los últimos 30 días). */
+/**
+ * Solicitudes del cliente aún vigentes: las pendientes y las que el
+ * restaurante ha decidido en los últimos 30 días. Las que el propio cliente
+ * ha cancelado desaparecen de la lista en cuanto las cancela.
+ */
 export async function forClient(userId) {
   const rows = await db.all(
     `SELECT * FROM group_requests WHERE user_id = ?
+        AND status <> 'cancelled'
         AND (status = 'pending' OR created_at > ?)
       ORDER BY status = 'pending' DESC, day, time_min`,
     [userId, clock.sql(clock.addDays(clock.now(), -30))],
@@ -127,12 +132,16 @@ export async function reject(staffId, id, input) {
   });
 }
 
-/** Para el panel: pendientes primero y las decididas de los últimos 30 días. */
+/**
+ * Para el panel: pendientes primero y las respondidas de los últimos 30 días.
+ * Las que ha retirado el cliente no se muestran: nadie tiene que responderlas.
+ */
 export async function forStaff() {
   const rows = await db.all(
     `SELECT g.*, u.name AS user_name, u.phone AS user_phone, u.email AS user_email
        FROM group_requests g LEFT JOIN users u ON u.id = g.user_id
-      WHERE g.status = 'pending' OR g.created_at > ?
+      WHERE g.status <> 'cancelled'
+        AND (g.status = 'pending' OR g.created_at > ?)
       ORDER BY g.status = 'pending' DESC, g.day, g.time_min`,
     [clock.sql(clock.addDays(clock.now(), -30))],
   );

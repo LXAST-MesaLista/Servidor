@@ -8,7 +8,7 @@ con Ubuntu Server 24.04. Es una de las tres partes del proyecto:
 |---|---|
 | **Servidor** (este repositorio) | Ofrece la API en `https://<dominio>/api/v1/` |
 | Web ([LXPT-UIB/WEB](https://github.com/LXPT-UIB/WEB)) | Su servidor llama a la API con un token Bearer |
-| App ([MesaLista-Firebase](https://github.com/LXPT-UIB/MesaLista-Firebase)) | Android (Kotlin y Jetpack Compose): llama a la API con un token Bearer y recibe avisos push por FCM |
+| App ([LXPT-UIB/APP](https://github.com/LXPT-UIB/APP)) | Android (Kotlin y Jetpack Compose): llama a la API con un token Bearer y recibe avisos push por FCM |
 
 Todas las reglas del servicio (disponibilidad, plazos, mesas, QR, pagos…) están
 en el servidor: la web y la app solo muestran datos y envían peticiones.

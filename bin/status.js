@@ -81,15 +81,22 @@ async function correo() {
   } else {
     try {
       const status = await mail.checkCredentials();
-      if (status === 401 || status === 403) {
-        linea('mal', `Correo (Azure): Azure rechaza la clave (HTTP ${status})`, 'sudo mesalista correo con la cadena de conexión actual');
-      } else if (status >= 500 || status === 0) {
-        linea('aviso', `Correo (Azure): Azure no responde bien ahora (HTTP ${status})`);
-      } else {
+      if (status === 400 || status === 202) {
         linea('ok', `Correo (Azure): clave aceptada · remitente ${config('mail.sender', '')}`);
+      } else if (status === 401 || status === 403) {
+        linea('mal', `Correo (Azure): Azure rechaza la clave (HTTP ${status})`, 'sudo mesalista correo con la cadena de conexión nueva');
+      } else if (status === 429) {
+        linea('aviso', 'Correo (Azure): límite de envíos de Azure alcanzado; los correos salen más tarde');
+      } else {
+        linea('aviso', `Correo (Azure): respuesta inesperada de Azure (HTTP ${status})`, 'prueba a enviar uno: sudo mesalista correo');
       }
     } catch (e) {
-      linea('mal', `Correo (Azure): no se puede conectar con Azure (${e.message})`);
+      // Un tiempo de espera no demuestra que la clave falle: solo se avisa.
+      if (/Timeout|Abort/.test(e.message)) {
+        linea('aviso', 'Correo (Azure): Azure no ha respondido a tiempo', 'prueba a enviar uno: sudo mesalista correo');
+      } else {
+        linea('mal', `Correo (Azure): no se puede conectar con Azure (${e.message})`);
+      }
     }
   }
   await cola('email_outbox', 'correos', configurado);

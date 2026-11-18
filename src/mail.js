@@ -10,7 +10,7 @@
 // con la clave del recurso (no hace falta ninguna aplicación de Microsoft
 // Entra). Sin cadena de conexión en config.json, se quedan en la cola.
 
-import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, createHmac, randomBytes } from 'node:crypto';
 import * as db from './db.js';
 import * as clock from './clock.js';
 import * as push from './push.js';
@@ -120,36 +120,12 @@ export async function flush(limit = 20) {
  * (dominio › MailFrom addresses), no aquí.
  */
 export async function send(to, subject, body) {
-  const [endpoint, key] = connection(String(config('mail.connection_string', '')));
-  const json = JSON.stringify({
+  const res = await postSend({
     senderAddress: String(config('mail.sender', '')),
     recipients: { to: [{ address: to }] },
     content: { subject, plainText: body },
     userEngagementTrackingDisabled: true,
   });
-  const host = new URL(endpoint).host;
-  const date = new Date().toUTCString();
-  const contentHash = createHash('sha256').update(json, 'utf8').digest('base64');
-  const signature = createHmac('sha256', key)
-    .update(`POST\n${SEND_API}\n${date};${host};${contentHash}`, 'utf8')
-    .digest('base64');
-
-  let res;
-  try {
-    res = await fetch(endpoint + SEND_API, {
-      method: 'POST',
-      body: json,
-      headers: {
-        'Content-Type': 'application/json',
-        'x-ms-date': date,
-        'x-ms-content-sha256': contentHash,
-        Authorization: `HMAC-SHA256 SignedHeaders=x-ms-date;host;x-ms-content-sha256&Signature=${signature}`,
-      },
-      signal: AbortSignal.timeout(15_000),
-    });
-  } catch (e) {
-    throw new Error(`Azure: ${e.cause?.code ?? e.name}`);
-  }
   if (res.status === 202) {
     return;
   }
@@ -168,29 +144,44 @@ export async function send(to, subject, body) {
 
 /**
  * Comprueba la cadena de conexión sin enviar ningún correo (lo usa
- * «mesalista estado»): pide el estado de una operación de envío que no
- * existe, firmada igual que un envío. Si Azure acepta la firma, responde que
- * no la encuentra (404); si la clave no vale, 401. Devuelve el código HTTP.
+ * «mesalista estado»): una petición de envío firmada igual que las de verdad,
+ * pero sin destinatarios. Azure comprueba la firma antes que el contenido: con
+ * la clave buena la rechaza por el contenido (400) y no envía nada; con una
+ * clave que no vale, 401. Devuelve el código HTTP.
  */
 export async function checkCredentials() {
+  const res = await postSend({
+    senderAddress: String(config('mail.sender', '')),
+    recipients: { to: [] },
+    content: { subject: 'MesaLista · comprobación', plainText: 'No se envía.' },
+    userEngagementTrackingDisabled: true,
+  });
+  await res.arrayBuffer().catch(() => null);
+  return res.status;
+}
+
+/** POST /emails:send firmado con HMAC-SHA256 y la clave del recurso. */
+async function postSend(payload) {
   const [endpoint, key] = connection(String(config('mail.connection_string', '')));
-  const path = `/emails/operations/${randomUUID()}?api-version=2023-03-31`;
+  const json = JSON.stringify(payload);
   const host = new URL(endpoint).host;
   const date = new Date().toUTCString();
-  const contentHash = createHash('sha256').update('', 'utf8').digest('base64');
+  const contentHash = createHash('sha256').update(json, 'utf8').digest('base64');
   const signature = createHmac('sha256', key)
-    .update(`GET\n${path}\n${date};${host};${contentHash}`, 'utf8')
+    .update(`POST\n${SEND_API}\n${date};${host};${contentHash}`, 'utf8')
     .digest('base64');
   try {
-    const res = await fetch(endpoint + path, {
+    return await fetch(endpoint + SEND_API, {
+      method: 'POST',
+      body: json,
       headers: {
+        'Content-Type': 'application/json',
         'x-ms-date': date,
         'x-ms-content-sha256': contentHash,
         Authorization: `HMAC-SHA256 SignedHeaders=x-ms-date;host;x-ms-content-sha256&Signature=${signature}`,
       },
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(15_000),
     });
-    return res.status;
   } catch (e) {
     throw new Error(`Azure: ${e.cause?.code ?? e.name}`);
   }

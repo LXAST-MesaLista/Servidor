@@ -71,7 +71,8 @@ despliegue/
   install.sh       Instalación completa en Azure (Ubuntu 24.04)
   mesalista        Comando de administración (se instala en /usr/local/bin)
   nginx-mesalista.conf, mesalista-api.service, permisos.sql, backup.sh, restore.sh
-docs/              openapi.yaml, integracion.md y manual-rutas.md/.pdf (cómo funcionan las rutas, con diagramas)
+docs/              openapi.yaml, integracion.md, manual-rutas.md/.pdf (cómo funcionan las rutas)
+                   y manual-base-de-datos.md/.pdf (cómo se conecta con PostgreSQL), con diagramas
 ```
 
 ## Configuración (`config/config.json`)

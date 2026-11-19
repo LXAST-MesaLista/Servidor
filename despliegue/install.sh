@@ -6,6 +6,9 @@
 #   sudo bash despliegue/install.sh                      instala o actualiza
 #   sudo bash despliegue/install.sh --dominio <dominio>  cambia el dominio guardado
 #   sudo bash despliegue/install.sh --reset-db           además borra y recrea la base de datos
+#   sudo bash despliegue/install.sh --no-interactivo     sin preguntas (Ansible): los datos llegan
+#        por variables de entorno: SERVER_DOMAIN, LE_EMAIL, ADMIN_EMAIL, ML_ADMIN_PASSWORD,
+#        ML_CLOSE_PIN y, si se quiere, MAIL_CONNECTION y MAIL_SENDER
 #
 # Se puede ejecutar varias veces: no borra datos salvo con --reset-db.
 # Los datos que pide la primera vez se guardan en /etc/mesalista/install.env.
@@ -34,12 +37,14 @@ NODE_MAJOR=24
 
 RESET_DB=0
 NUEVO_DOMINIO=""
+NO_INTERACTIVO=${ML_NO_INTERACTIVO:-0}
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --reset-db)  RESET_DB=1 ;;
+        --no-interactivo) NO_INTERACTIVO=1 ;;
         --dominio)   NUEVO_DOMINIO=${2:-}; shift ;;
         --dominio=*) NUEVO_DOMINIO=${1#*=} ;;
-        -h|--help)   sed -n '2,11p' "$0"; exit 0 ;;
+        -h|--help)   sed -n '2,14p' "$0"; exit 0 ;;
         *)           echo "Opción desconocida: $1 (usa --help)" >&2; exit 1 ;;
     esac
     shift
@@ -81,11 +86,22 @@ config_value() {  # config_value ARCHIVO "db.pass"
 mkdir -p "$ETC_DIR"
 chmod 700 "$ETC_DIR"
 # shellcheck source=/dev/null
+# Lo que llega por variables de entorno (p. ej. desde Ansible) manda sobre lo
+# guardado en install.env.
+for v in SERVER_DOMAIN LE_EMAIL ADMIN_EMAIL; do printf -v "ENV_$v" '%s' "${!v:-}"; done
 [[ -f "$ENV_FILE" ]] && source "$ENV_FILE"
+for v in SERVER_DOMAIN LE_EMAIL ADMIN_EMAIL; do
+    e="ENV_$v"
+    [[ -n "${!e}" ]] && printf -v "$v" '%s' "${!e}"
+done
 
 ask() {  # ask VARIABLE "Pregunta" [secreto]
     local var=$1 prompt=$2 secret=${3:-} value
     [[ -n "${!var:-}" ]] && return
+    if [[ $NO_INTERACTIVO -eq 1 ]]; then
+        warn "Falta $var: sin preguntas (--no-interactivo) tiene que llegar como variable de entorno."
+        exit 1
+    fi
     if [[ -n "$secret" ]]; then read -rsp "$prompt: " value; echo; else read -rp "$prompt: " value; fi
     printf -v "$var" '%s' "$value"
 }
@@ -107,7 +123,7 @@ ask LE_EMAIL "Correo para avisos de Let's Encrypt"
 ask ADMIN_EMAIL "Correo de la cuenta de administrador de MesaLista"
 # Las credenciales de correo solo se piden al crear config.json y se guardan
 # allí, no en install.env.
-if [[ ! -f "$CONFIG" ]]; then
+if [[ ! -f "$CONFIG" && $NO_INTERACTIVO -eq 0 ]]; then
     echo "Correo con Azure Communication Services: cadena de conexión del recurso Communication Services"
     echo "(Configuración > Claves) y remitente de su dominio (DoNotReply@….azurecomm.net)."
     echo "Déjalos en blanco para configurarlos más tarde con $APP_DIR/bin/configure-mail.js."
@@ -212,7 +228,11 @@ DB_PASS=""
 [[ "$DB_PASS" =~ ^[A-Za-z0-9._-]+$ ]] || { warn "La contraseña de la base de datos de config.json tiene caracteres no admitidos."; exit 1; }
 
 if [[ $RESET_DB -eq 1 ]]; then
-    read -rp "Se BORRARÁN todas las reservas y cuentas. Escribe BORRAR para seguir: " sure
+    if [[ $NO_INTERACTIVO -eq 1 ]]; then
+        sure=${ML_CONFIRMAR_RESET:-}   # sin preguntas: ML_CONFIRMAR_RESET=BORRAR
+    else
+        read -rp "Se BORRARÁN todas las reservas y cuentas. Escribe BORRAR para seguir: " sure
+    fi
     [[ "$sure" == "BORRAR" ]] || { warn "Cancelado."; exit 1; }
     systemctl stop mesalista-api cron 2>/dev/null || true
     psql_admin -c "DROP DATABASE IF EXISTS ${DB_NAME} WITH (FORCE)"
@@ -437,14 +457,22 @@ EOF
 ADMINS=$(psql_admin -tA -d "$DB_NAME" -c "SELECT COUNT(*) FROM users WHERE role = 'admin'")
 if [[ "$ADMINS" == "0" ]]; then
     say "Cuenta de administrador ($ADMIN_EMAIL)"
-    sudo -u "$APP_USER" "$NODE_BIN" "$APP_DIR/bin/create-user.js" admin "$ADMIN_EMAIL" "Administrador"
+    # Sin preguntas, la contraseña llega en ML_ADMIN_PASSWORD (por el entorno, no
+    # en la línea de órdenes, que vería cualquiera con «ps»).
+    if [[ $NO_INTERACTIVO -eq 1 && -z "${ML_ADMIN_PASSWORD:-}" ]]; then
+        warn "Falta ML_ADMIN_PASSWORD (contraseña del administrador)."; exit 1
+    fi
+    ML_PASSWORD="${ML_ADMIN_PASSWORD:-}" sudo --preserve-env=ML_PASSWORD -u "$APP_USER"         "$NODE_BIN" "$APP_DIR/bin/create-user.js" admin "$ADMIN_EMAIL" "Administrador"
 fi
 
 # PIN de «Cerrar local» (se pide solo la primera vez).
 HAS_PIN=$(psql_admin -tA -d "$DB_NAME" -c "SELECT EXISTS (SELECT 1 FROM secrets WHERE name = 'close_pin')")
 if [[ "$HAS_PIN" != "t" ]]; then
     say "PIN de «Cerrar local»"
-    sudo -u "$APP_USER" "$NODE_BIN" "$APP_DIR/bin/set-close-pin.js"
+    if [[ $NO_INTERACTIVO -eq 1 && -z "${ML_CLOSE_PIN:-}" ]]; then
+        warn "Falta ML_CLOSE_PIN (PIN de «Cerrar local», de 4 a 8 cifras)."; exit 1
+    fi
+    ML_PIN="${ML_CLOSE_PIN:-}" sudo --preserve-env=ML_PIN -u "$APP_USER" "$NODE_BIN" "$APP_DIR/bin/set-close-pin.js"
 fi
 
 # ---------------------------------------------------------------------------

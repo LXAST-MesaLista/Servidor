@@ -5,6 +5,9 @@
 //
 //   sudo mesalista paypal
 //   (vacío como Client ID = quitar las claves y desactivar la señal)
+//
+// Sin preguntas (Ansible): las claves llegan en ML_PAYPAL_CLIENT_ID y
+// ML_PAYPAL_SECRET (por el entorno, nunca en la línea de órdenes).
 
 import { settings } from '../src/config.js';
 import { payPalAuth } from '../src/payments.js';
@@ -13,9 +16,13 @@ import { run, ask, saveConfig } from './lib/cli.js';
 const KEY_RE = /^[A-Za-z0-9_-]{20,128}$/;
 
 run(async () => {
-  console.log('PayPal sandbox: developer.paypal.com > Apps & Credentials > Sandbox > tu app.');
-  const clientId = await ask('Client ID: ');
-  const secret = clientId === '' ? '' : await ask('Secret (no se ve al escribir): ', true);
+  const desdeEntorno = process.env.ML_PAYPAL_CLIENT_ID !== undefined;
+  if (!desdeEntorno) {
+    console.log('PayPal sandbox: developer.paypal.com > Apps & Credentials > Sandbox > tu app.');
+  }
+  const clientId = desdeEntorno ? process.env.ML_PAYPAL_CLIENT_ID.trim() : await ask('Client ID: ');
+  const secret = clientId === '' ? ''
+    : desdeEntorno ? String(process.env.ML_PAYPAL_SECRET ?? '').trim() : await ask('Secret (no se ve al escribir): ', true);
 
   if (clientId !== '') {
     if (!KEY_RE.test(clientId) || !KEY_RE.test(secret)) {

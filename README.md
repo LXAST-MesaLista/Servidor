@@ -112,6 +112,13 @@ docs/              openapi.yaml, integracion.md, manual-rutas.md/.pdf (cómo fun
    El repositorio puede estar en la carpeta personal: en Ubuntu 24.04 tiene
    permisos 750 y el usuario `postgres` no puede entrar, así que el script le
    pasa los `.sql` por la entrada estándar en lugar de por su ruta.
+
+   **Sin preguntas** (para automatizarlo): `sudo bash despliegue/install.sh --no-interactivo`,
+   con los datos en variables de entorno (`SERVER_DOMAIN`, `LE_EMAIL`, `ADMIN_EMAIL`,
+   `ML_ADMIN_PASSWORD`, `ML_CLOSE_PIN` y, si se quiere, `MAIL_CONNECTION` y `MAIL_SENDER`;
+   `sudo bash despliegue/install.sh --help`). Así lo usa el despliegue con Ansible de
+   [LXPT-UIB/despliegue-mesalista-ansible](https://github.com/LXPT-UIB/despliegue-mesalista-ansible),
+   que instala el servidor, la web y PayPal, el correo y Firebase con una sola orden.
 4. Opcional, cuando se tengan las claves:
 
    ```bash

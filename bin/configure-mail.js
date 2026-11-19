@@ -7,6 +7,9 @@
 //   sudo mesalista correo
 //   («no» como cadena de conexión = desactivar el envío: los correos se quedan
 //   en email_outbox)
+//
+// Sin preguntas (Ansible): ML_MAIL_CONNECTION, ML_MAIL_SENDER y, si se quiere
+// un correo de prueba, ML_MAIL_TEST (por el entorno, nunca en la línea de órdenes).
 
 import { settings } from '../src/config.js';
 import * as mail from '../src/mail.js';
@@ -21,11 +24,16 @@ run(async () => {
     sender: String(old.sender ?? ''),
   };
 
+  const desdeEntorno = process.env.ML_MAIL_CONNECTION !== undefined;
+  const entorno = (nombre) => String(process.env[nombre] ?? '').trim();
   console.log(current.enabled && current.connection_string !== ''
     ? `Correo activado (remitente ${current.sender}).`
     : 'Correo desactivado: los correos se quedan en la cola.');
-  console.log('Portal de Azure > tu recurso Communication Services > Configuración > Claves > Cadena de conexión.');
-  let connection = await ask('Cadena de conexión (no se ve al escribir; vacío = mantener la actual; «no» = desactivar): ', true);
+  if (!desdeEntorno) {
+    console.log('Portal de Azure > tu recurso Communication Services > Configuración > Claves > Cadena de conexión.');
+  }
+  let connection = desdeEntorno ? entorno('ML_MAIL_CONNECTION')
+    : await ask('Cadena de conexión (no se ve al escribir; vacío = mantener la actual; «no» = desactivar): ', true);
 
   if (connection.toLowerCase() === 'no') {
     current.enabled = false;
@@ -35,8 +43,11 @@ run(async () => {
       console.error('Eso no parece una cadena de conexión («endpoint=https://…;accesskey=…»). No se ha cambiado nada.');
       return 2;
     }
-    console.log('Remitente: recurso Email Communication Services > tu dominio > MailFrom addresses.');
-    let sender = await ask(`Remitente (DoNotReply@….azurecomm.net)${current.sender !== '' ? ` [${current.sender}]` : ''}: `);
+    if (!desdeEntorno) {
+      console.log('Remitente: recurso Email Communication Services > tu dominio > MailFrom addresses.');
+    }
+    let sender = desdeEntorno ? entorno('ML_MAIL_SENDER')
+      : await ask(`Remitente (DoNotReply@….azurecomm.net)${current.sender !== '' ? ` [${current.sender}]` : ''}: `);
     sender = sender !== '' ? sender : current.sender;
     if (!isEmail(sender)) {
       console.error('El remitente no es una dirección de correo. No se ha cambiado nada.');
@@ -45,7 +56,7 @@ run(async () => {
     current = { enabled: true, connection_string: connection, sender };
 
     // Prueba opcional con la configuración nueva, antes de guardarla.
-    const to = await ask('Correo al que enviar una prueba (vacío = no probar): ');
+    const to = desdeEntorno ? entorno('ML_MAIL_TEST') : await ask('Correo al que enviar una prueba (vacío = no probar): ');
     if (to !== '') {
       settings.mail = current;
       try {

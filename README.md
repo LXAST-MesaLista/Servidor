@@ -13,6 +13,9 @@ con Ubuntu Server 24.04. Es una de las tres partes del proyecto:
 Todas las reglas del servicio (disponibilidad, plazos, mesas, QR, pagos…) están
 en el servidor: la web y la app solo muestran datos y envían peticiones.
 
+**Visión de conjunto:** [`docs/integracion-tecnologias.md`](docs/integracion-tecnologias.md)
+explica todas las tecnologías del proyecto y cómo se integran, con diagramas.
+
 **Para los equipos de la web y de la app:** [`docs/integracion.md`](docs/integracion.md)
 explica cómo conectarse y [`docs/openapi.yaml`](docs/openapi.yaml) describe todas
 las rutas.
@@ -73,6 +76,7 @@ despliegue/
   nginx-mesalista.conf, mesalista-api.service, permisos.sql, backup.sh, restore.sh
 docs/              openapi.yaml, integracion.md, manual-rutas.md/.pdf (cómo funcionan las rutas)
                    y manual-base-de-datos.md/.pdf (cómo se conecta con PostgreSQL), con diagramas
+                   integracion-tecnologias.md/.pdf: todas las tecnologías y cómo se integran
 ```
 
 ## Configuración (`config/config.json`)

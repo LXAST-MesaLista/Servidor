@@ -64,7 +64,14 @@ for (const [key, url] of Object.entries(config.front)) {
 }
 const mailConnection = process.env.ML_MAIL_CONNECTION ?? '';
 const mailSender = process.env.ML_MAIL_SENDER ?? '';
-if (mailConnection !== '' && mailSender !== '') {
+// Igual que configure-mail.js: con una cadena mal copiada no se activa el correo.
+const conexionValida = /^endpoint=https:\/\/[^;\s]+;accesskey=[A-Za-z0-9+/]+=*;?$/i.test(mailConnection);
+const remitenteValido = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mailSender);
+if (mailConnection !== '' && (!conexionValida || !remitenteValido)) {
+  console.error('config.json: el correo de Azure no se activa: la cadena de conexión («endpoint=https://…;accesskey=…»)'
+    + ' o el remitente no tienen el formato correcto. Configúralo después con «sudo mesalista correo».');
+}
+if (conexionValida && remitenteValido) {
   config.mail = { enabled: true, connection_string: mailConnection, sender: mailSender };
 }
 

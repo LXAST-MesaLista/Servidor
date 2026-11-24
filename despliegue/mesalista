@@ -82,10 +82,14 @@ estado() {
     if [[ "$mesas" =~ ^[0-9]+$ ]]; then bien "base de datos: ${mesas} mesas activas"; else mal "no se puede consultar la base de datos"; fi
 
     titulo "HTTPS en ${domain:-?}"
-    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 --resolve "$domain:443:127.0.0.1" "https://$domain/api/v1/config" || true)
+    # Sin certificado de Let's Encrypt, nginx usa uno autofirmado: se acepta solo
+    # para ver si la API y la web responden (el certificado se marca aparte).
+    local inseguro=()
+    [[ -f "/etc/letsencrypt/live/$domain/fullchain.pem" ]] || inseguro=(-k)
+    code=$(curl -s "${inseguro[@]}" -o /dev/null -w '%{http_code}' --max-time 10 --resolve "$domain:443:127.0.0.1" "https://$domain/api/v1/config" || true)
     if [[ "$code" == "200" ]]; then bien "API: https://$domain/api/v1/config responde"; else mal "API: https://$domain/api/v1/config responde ${code:-sin respuesta}"; fi
     if [[ -f /etc/systemd/system/mesalista-web.service ]]; then
-        code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 --resolve "$domain:443:127.0.0.1" "https://$domain/" || true)
+        code=$(curl -s "${inseguro[@]}" -o /dev/null -w '%{http_code}' --max-time 15 --resolve "$domain:443:127.0.0.1" "https://$domain/" || true)
         if [[ "$code" == "200" ]]; then bien "web: https://$domain/ responde"; else mal "web: https://$domain/ responde ${code:-sin respuesta} (journalctl -u mesalista-web)"; fi
     fi
     if [[ -f "/etc/letsencrypt/live/$domain/fullchain.pem" ]]; then
@@ -100,7 +104,11 @@ estado() {
         fi
         systemctl is-active --quiet certbot.timer || aviso "  certbot.timer no está activo: el certificado no se renovará solo"
     else
-        mal "sin certificado de Let's Encrypt: se usa uno autofirmado (vuelve a ejecutar install.sh)"
+        if [[ "$domain" =~ ^[0-9.]+$ ]]; then
+            mal "sin certificado de Let's Encrypt: el dominio es una IP y Let's Encrypt no las certifica (pon la etiqueta DNS de Azure con install.sh --dominio)"
+        else
+            mal "sin certificado de Let's Encrypt: se usa uno autofirmado (revisa que $domain apunte a esta máquina y el puerto 80, y vuelve a ejecutar install.sh)"
+        fi
     fi
 
     titulo "Correo, avisos push y PayPal"
@@ -108,8 +116,10 @@ estado() {
 
     titulo "Máquina"
     ultima=$(find /var/backups/mesalista -maxdepth 1 -name '*.tar.gz' -printf '%T@ %f\n' 2>/dev/null | sort -n | tail -1 || true)
-    if [[ -z "$ultima" ]]; then
-        mal "no hay ninguna copia en /var/backups/mesalista (sudo bash /usr/local/lib/mesalista/backup.sh)"
+    if [[ -z "$ultima" && ! -s /var/log/mesalista/backup.log ]]; then
+        aviso "todavía no se ha hecho ninguna copia: la primera, a las 03:30 (ya: sudo bash /usr/local/lib/mesalista/backup.sh)"
+    elif [[ -z "$ultima" ]]; then
+        mal "no hay ninguna copia en /var/backups/mesalista (mira /var/log/mesalista/backup.log)"
     else
         edad=$(( ($(date +%s) - ${ultima%%.*}) / 3600 ))
         if (( edad > 26 )); then

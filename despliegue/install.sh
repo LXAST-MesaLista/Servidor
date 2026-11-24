@@ -118,6 +118,12 @@ ask SERVER_DOMAIN "Dominio del servidor (p. ej. mesalista.spaincentral.cloudapp.
 SERVER_DOMAIN=$(normalizar_dominio "$SERVER_DOMAIN")
 [[ "$SERVER_DOMAIN" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$ ]] \
     || { warn "«$SERVER_DOMAIN» no es un dominio válido."; exit 1; }
+if [[ "$SERVER_DOMAIN" =~ ^[0-9.]+$ ]]; then
+    warn "«$SERVER_DOMAIN» es una IP: Let's Encrypt no da certificados para IPs y no habría HTTPS válido."
+    warn "En Azure: Dirección IP pública > Configuración > Etiqueta de nombre DNS, y usa ese nombre"
+    warn "(p. ej. mesalista.spaincentral.cloudapp.azure.com) con --dominio."
+    exit 1
+fi
 DOMAIN=$SERVER_DOMAIN
 ask LE_EMAIL "Correo para avisos de Let's Encrypt"
 ask ADMIN_EMAIL "Correo de la cuenta de administrador de MesaLista"

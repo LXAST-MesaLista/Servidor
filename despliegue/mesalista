@@ -61,7 +61,7 @@ estado() {
     if [[ -f /etc/systemd/system/mesalista-web.service ]]; then
         servicio mesalista-web "web (mesalista-web)"
     else
-        nada "web sin instalar en esta máquina (LXPT-UIB/WEB)"
+        nada "web sin instalar en esta máquina (LXAST-MesaLista/WEB)"
     fi
     servicio nginx "nginx (HTTPS)"
     if pg_isready -q 2>/dev/null; then bien "PostgreSQL acepta conexiones"; else mal "PostgreSQL no responde (pg_lsclusters)"; fi

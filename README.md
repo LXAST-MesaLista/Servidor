@@ -7,8 +7,8 @@ con Ubuntu Server 24.04. Es una de las tres partes del proyecto:
 | Parte | Cómo se conecta |
 |---|---|
 | **Servidor** (este repositorio) | Ofrece la API en `https://<dominio>/api/v1/` |
-| Web ([LXPT-UIB/WEB](https://github.com/LXPT-UIB/WEB)) | Su servidor llama a la API con un token Bearer |
-| App ([LXPT-UIB/APP](https://github.com/LXPT-UIB/APP)) | Android (Kotlin y Jetpack Compose): llama a la API con un token Bearer y recibe avisos push por FCM |
+| Web ([LXAST-MesaLista/WEB](https://github.com/LXAST-MesaLista/WEB)) | Su servidor llama a la API con un token Bearer |
+| App ([LXAST-MesaLista/APP](https://github.com/LXAST-MesaLista/APP)) | Android (Kotlin y Jetpack Compose): llama a la API con un token Bearer y recibe avisos push por FCM |
 
 Todas las reglas del servicio (disponibilidad, plazos, mesas, QR, pagos…) están
 en el servidor: la web y la app solo muestran datos y envían peticiones.
@@ -102,7 +102,7 @@ docs/              openapi.yaml, integracion.md, manual-rutas.md/.pdf (cómo fun
 3. En la máquina:
 
    ```bash
-   git clone https://github.com/LXPT-UIB/Servidor.git ~/Servidor
+   git clone https://github.com/LXAST-MesaLista/Servidor.git ~/Servidor
    cd ~/Servidor && sudo bash despliegue/install.sh
    ```
 
@@ -121,7 +121,7 @@ docs/              openapi.yaml, integracion.md, manual-rutas.md/.pdf (cómo fun
    con los datos en variables de entorno (`SERVER_DOMAIN`, `LE_EMAIL`, `ADMIN_EMAIL`,
    `ML_ADMIN_PASSWORD`, `ML_CLOSE_PIN` y, si se quiere, `MAIL_CONNECTION` y `MAIL_SENDER`;
    `sudo bash despliegue/install.sh --help`). Así lo usa el despliegue con Ansible de
-   [LXPT-UIB/despliegue-mesalista-ansible](https://github.com/LXPT-UIB/despliegue-mesalista-ansible),
+   [LXAST-MesaLista/despliegue-mesalista-ansible](https://github.com/LXAST-MesaLista/despliegue-mesalista-ansible),
    que instala el servidor, la web y PayPal, el correo y Firebase con una sola orden.
 4. Opcional, cuando se tengan las claves:
 
@@ -137,7 +137,7 @@ Queda así:
 |---|---|
 | API | `https://<dominio>/api/v1/` → nginx → `mesalista-api.service` (Node.js en `127.0.0.1:8091`) |
 | Código y `config.json` | `/opt/mesalista-servidor` (dueño `root`, grupo `mesalista`) |
-| Sitio de nginx | `/etc/nginx/sites-available/mesalista`. Sin la web, solo la API (`despliegue/nginx-mesalista.conf`). Con la web ([LXPT-UIB/WEB](https://github.com/LXPT-UIB/WEB), en `/opt/mesalista-web`), los dos instaladores generan el mismo sitio con la plantilla de la web, así que ninguno pisa al otro. Si quedaba Apache de una instalación anterior, se desactiva |
+| Sitio de nginx | `/etc/nginx/sites-available/mesalista`. Sin la web, solo la API (`despliegue/nginx-mesalista.conf`). Con la web ([LXAST-MesaLista/WEB](https://github.com/LXAST-MesaLista/WEB), en `/opt/mesalista-web`), los dos instaladores generan el mismo sitio con la plantilla de la web, así que ninguno pisa al otro. Si quedaba Apache de una instalación anterior, se desactiva |
 | Base de datos | PostgreSQL 16 solo en local; dueño `mesalista_owner`, la API entra como `mesalista` (solo lee y escribe datos) |
 | Tareas | `worker.js` cada minuto, `worker.js --diario` a las 04:00 y copia a las 03:30 (`/etc/cron.d/mesalista`) |
 | Copias | `/var/backups/mesalista`, las de los últimos 14 días |

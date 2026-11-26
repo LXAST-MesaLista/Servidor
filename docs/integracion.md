@@ -144,7 +144,7 @@ El servidor envía al cliente a estas direcciones (plantillas `front.*` de
   (`127.0.0.1:8091`) y el resto, a la web (`mesalista-web.service`,
   `127.0.0.1:8092`, instalada en `/opt/mesalista-web`).
 - La plantilla del sitio completo es la de la web
-  (`despliegue/nginx-mesalista.conf` de LXPT-UIB/WEB). Si la web está instalada,
+  (`despliegue/nginx-mesalista.conf` de LXAST-MesaLista/WEB). Si la web está instalada,
   `install.sh` del servidor también la usa; si no, usa la suya, que solo tiene la
   API. Los cambios del sitio (caché, cabeceras, rutas de la web) se hacen en la
   plantilla de la web, que debe mantener los marcadores `__DOMAIN__`,

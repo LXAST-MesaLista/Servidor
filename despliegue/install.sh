@@ -17,7 +17,7 @@
 #   /opt/mesalista-servidor          la API (src/, bin/, node_modules/) y config/config.json
 #   mesalista-api.service            el proceso de Node.js, en 127.0.0.1:8091
 #   nginx                            HTTPS en https://<dominio>/api/v1/ → Node.js
-#                                    (con la web de LXPT-UIB/WEB instalada, su sitio)
+#                                    (con la web de LXAST-MesaLista/WEB instalada, su sitio)
 
 set -euo pipefail
 
@@ -341,7 +341,7 @@ systemctl restart mesalista-api cron
 # ---------------------------------------------------------------------------
 # nginx (RS-01). Mientras no hay certificado de Let's Encrypt arranca con uno
 # autofirmado, para poder servir el desafío HTTP por el puerto 80.
-# El sitio es uno solo para la API y la web: si la web (LXPT-UIB/WEB) ya está
+# El sitio es uno solo para la API y la web: si la web (LXAST-MesaLista/WEB) ya está
 # instalada se genera con su plantilla, que incluye la API; si no, con la de
 # este repositorio, solo con la API. Así no se pisa el sitio de la web.
 # ---------------------------------------------------------------------------
@@ -503,7 +503,7 @@ say "Listo"
 cat <<EOF
   API:               https://${DOMAIN}/api/v1/config
   Comprobarlo todo:  sudo mesalista estado      (mensajes: sudo mesalista logs)
-  Sitio de nginx:    ${SITE}   (la web, LXPT-UIB/WEB, se instala aparte)
+  Sitio de nginx:    ${SITE}   (la web, LXAST-MesaLista/WEB, se instala aparte)
   Configuración:     ${CONFIG}
   Copias:            /var/backups/mesalista (diarias a las 03:30)
 
